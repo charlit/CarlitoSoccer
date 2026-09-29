@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1a1f3a">
-<title>Head Ball</title>
+<title>Carlito Soccer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
 <style>
@@ -358,7 +358,7 @@ function drawBackground() {
   }
   g.strokeStyle = OUTLINE; g.lineWidth = 5; g.strokeRect(-5, 120, W + 10, 200);
   // panneaux publicitaires
-  const ads = [['HEAD BALL', '#ff3b3b'], ['⚽ GOAL !', '#2f7bff'], ['CARLITOS', '#ffd93d'], ['HEAD BALL', '#3ddc84'], ['OLÉ !', '#ff7ad9'], ['⚽ GOAL !', '#ff9f1c']];
+  const ads = [['CARLITO', '#ff3b3b'], ['SOCCER', '#2f7bff'], ['⚽ GOAL !', '#ffd93d'], ['CARLITO', '#3ddc84'], ['SOCCER', '#ff7ad9'], ['OLÉ !', '#ff9f1c']];
   ads.forEach(([t, c], i) => {
     const x = i * 160;
     g.fillStyle = c; g.fillRect(x, 318, 160, 26);
@@ -498,7 +498,7 @@ function drawSelect() {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = font(72);
   ctx.save(); ctx.translate(W / 2, 70); ctx.rotate(Math.sin(frame / 30) * 0.03);
-  outlinedText('HEAD BALL', 0, 0, '#ffd93d', 10); ctx.restore();
+  outlinedText('CARLITO SOCCER', 0, 0, '#ffd93d', 10); ctx.restore();
   ctx.font = font(22); outlinedText('Choisis ta tête !', W / 2, 125, '#fff', 5);
   const cw = 150, x0 = W / 2 - (HEADS.length - 1) * cw / 2;
   HEADS.forEach((h, k) => {

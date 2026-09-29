@@ -1,4 +1,4 @@
-// Suite de tests QA de Head Ball.
+// Suite de tests QA de Carlito Soccer.
 // À exécuter dans la page ouverte avec ?debug (window.__hb doit exister).
 // Chaque test repart d'un match neuf via g.start(tête J1, tête J2) et renvoie
 // { test, ok, detail }. Le résultat global est la dernière expression.

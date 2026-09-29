@@ -1,4 +1,4 @@
-# Head Ball
+# Carlito Soccer
 
 Foot à grosses têtes façon *Head Soccer*, à **2 joueurs sur le même écran**, en style cartoon.
 Un seul fichier (`public/index.html`), les visages dans `public/heads/`.
@@ -27,18 +27,18 @@ Puis `http://localhost:8196/` (ajoute `?debug` pour l'API de test `window.__hb`,
 Première fois :
 
 ```bash
-git clone https://github.com/charlit/CarlitoSoccer.git ~/HeadBall
+git clone https://github.com/charlit/CarlitoSoccer.git ~/CarlitoSoccer
 ```
 
 Puis, à chaque mise à jour :
 
 ```bash
-cd ~/HeadBall && git pull && docker build -t headball . && docker rm -f headball
+cd ~/CarlitoSoccer && git pull && docker build -t carlito-soccer . && docker rm -f carlito-soccer
 ```
 
 ```bash
-docker run -d --name headball --restart unless-stopped -p 8083:80 headball
+docker run -d --name carlito-soccer --restart unless-stopped -p 8083:80 carlito-soccer
 ```
 
-Le jeu répond alors sur le port **8083** du Mac mini. Ajoute la route (par ex. `/headball/`) dans la page « Mes jeux » (conteneur `hub`).
+Le jeu répond alors sur le port **8083** du Mac mini. Ajoute la route (par ex. `/carlitosoccer/`) dans la page « Mes jeux » (conteneur `hub`).
 Le jeu n'utilise que des chemins relatifs, il marche donc sous n'importe quel sous-chemin.

@@ -1,9 +1,9 @@
 ---
 name: qa-jeu
-description: QA de Head Ball (le jeu de foot à grosses têtes, à 2 joueurs, de ce repo) — lance la suite de tests automatisés (sélection des têtes, déplacements, saut, tir, tête, buts, barre transversale, collisions, fin de match, boutons tactiles) via le mode ?debug, vérifie le rendu desktop et mobile paysage, puis corrige et re-teste. Utiliser quand on demande « qa », « teste le jeu », « vérifie que ça marche », ou après toute modification de public/index.html (physique, dessin, contrôles, têtes).
+description: QA de Carlito Soccer (le jeu de foot à grosses têtes, à 2 joueurs, de ce repo) — lance la suite de tests automatisés (sélection des têtes, déplacements, saut, tir, tête, buts, barre transversale, collisions, fin de match, boutons tactiles) via le mode ?debug, vérifie le rendu desktop et mobile paysage, puis corrige et re-teste. Utiliser quand on demande « qa », « teste le jeu », « vérifie que ça marche », ou après toute modification de public/index.html (physique, dessin, contrôles, têtes).
 ---
 
-# QA Head Ball
+# QA Carlito Soccer
 
 Le jeu tient dans un seul fichier, `public/index.html` (canvas 960×540). Les visages sont dans `public/heads/p1.png` … `p5.png`
 (la liste et les noms sont dans le tableau `HEADS`). La QA teste le jeu **image par image** grâce au mode `?debug`.
@@ -12,8 +12,8 @@ n'est donc pas forcément un bug. On pilote le jeu avec `window.__hb` au lieu d'
 
 ## 1. Lancer le jeu
 
-- Démarre la preview avec `preview_start` `{ name: "head-ball" }`. La config est dans
-  `C:\Users\lesma\Github\.claude\launch.json` et sert `HeadBall/public` sur le port 8196.
+- Démarre la preview avec `preview_start` `{ name: "carlito-soccer" }`. La config est dans
+  `C:\Users\lesma\Github\.claude\launch.json` et sert `CarlitoSoccer/public` sur le port 8196.
   Hors de cette machine : `python -m http.server 8196 --directory public`.
 - Ouvre `http://localhost:8196/?debug&v=<valeur unique>` puis vérifie avec `read_console_messages` qu'il n'y a aucune erreur.
   **Change `v` à chaque rechargement après une modification** (le serveur Python n'envoie pas d'en-tête de cache).
