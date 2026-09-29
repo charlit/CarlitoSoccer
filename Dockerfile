@@ -1,4 +1,9 @@
-FROM nginx:alpine
-# la page du jeu est revérifiée à chaque visite (sinon Safari garde l'ancienne version)
-RUN printf 'server {\n  listen 80;\n  root /usr/share/nginx/html;\n  location / { add_header Cache-Control no-cache; }\n}\n' > /etc/nginx/conf.d/default.conf
-COPY public /usr/share/nginx/html
+FROM node:20-alpine
+WORKDIR /app
+COPY package.json ./
+RUN npm install --omit=dev
+COPY server.js ./
+COPY public ./public
+EXPOSE 8080
+ENV PORT=8080
+CMD ["node", "server.js"]

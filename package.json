@@ -1,0 +1,9 @@
+{
+  "name": "carlito-soccer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Carlito Soccer : foot à grosses têtes (IA, 2 joueurs, en ligne)",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "ws": "^8.18.0" }
+}
