@@ -27,7 +27,7 @@ Puis `http://localhost:8196/` (ajoute `?debug` pour l'API de test `window.__hb`,
 Première fois :
 
 ```bash
-git clone https://github.com/charlit/HeadBall.git ~/HeadBall
+git clone https://github.com/charlit/CarlitoSoccer.git ~/HeadBall
 ```
 
 Puis, à chaque mise à jour :
