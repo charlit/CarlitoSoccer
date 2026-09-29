@@ -65,7 +65,7 @@ Règles de jeu que la suite protège :
 ## 4. Contrôles visuels (pas couverts par la suite)
 
 Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
-- **Têtes** : les 5 visages bien découpés, contour noir épais, retournés pour J2 (il regarde vers la gauche).
+- **Têtes** : les 5 visages détourés au ras des cheveux (fond retiré par IA, `rembg` modèle `isnet-general-use`), contour noir qui suit la silhouette (`makeSprite`), retournés pour J2. Le canvas est rendu à la densité de l'écran (`fitCanvas`, jusqu'à 2,5×).
 - **Chaussure** sous chaque tête, rouge pour J1, bleue pour J2, qui monte devant pendant le tir.
 - **Cages** : filet, poteau et barre blancs rayés de rouge, dessinés devant la balle.
 - **HUD** : visages, score, chrono (rouge sous 10 s). « BUUUT ! » + confettis + tremblement après un but.

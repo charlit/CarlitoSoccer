@@ -15,8 +15,8 @@
 
   // 1. Les 5 visages sont chargés
   safe('visages', () => {
-    const bad = g.heads.filter((h) => !(h.img.complete && h.img.naturalWidth > 0)).map((h) => h.src);
-    check('visages', g.heads.length === 5 && bad.length === 0, bad.length ? 'non chargés : ' + bad.join(', ') : '5 visages chargés');
+    const bad = g.heads.filter((h) => !(h.img.complete && h.img.naturalWidth > 0 && h.sprite)).map((h) => h.src);
+    check('visages', g.heads.length === 5 && bad.length === 0, bad.length ? 'non chargés : ' + bad.join(', ') : '5 visages chargés et détourés avec contour');
   });
 
   // 2. Sélection : chaque joueur choisit sa tête et se déclare prêt → compte à rebours → match

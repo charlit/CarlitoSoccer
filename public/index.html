@@ -42,11 +42,31 @@ const HEADS = [
   { src: 'heads/p4.png', name: 'Le Boss' },
   { src: 'heads/p5.png', name: 'Éclipse' },
 ];
-HEADS.forEach((h) => { h.img = new Image(); h.img.src = h.src; });
+// Chaque tête détourée reçoit un contour noir cartoon qui suit sa silhouette (calculé une fois au chargement).
+const SPRITE_H = 360, SPRITE_O = 13;
+function makeSprite(img) {
+  const h = SPRITE_H, w = Math.round(h * img.naturalWidth / img.naturalHeight), o = SPRITE_O;
+  const c = document.createElement('canvas'); c.width = w + 2 * o; c.height = h + 2 * o;
+  const g = c.getContext('2d');
+  for (let a = 0; a < 24; a++) g.drawImage(img, o + Math.cos(a * Math.PI / 12) * o, o + Math.sin(a * Math.PI / 12) * o, w, h);
+  g.globalCompositeOperation = 'source-in'; g.fillStyle = '#1b1b2f'; g.fillRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = 'source-over'; g.drawImage(img, o, o, w, h);
+  return c;
+}
+HEADS.forEach((h) => { h.img = new Image(); h.img.onload = () => { h.sprite = makeSprite(h.img); }; h.img.src = h.src; });
 const COLORS = [{ main: '#ff3b3b', dark: '#b3151c' }, { main: '#2f7bff', dark: '#1543a8' }];
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
+// Résolution réelle du canvas = taille affichée × densité de l'écran (net sur Retina), le jeu reste en coordonnées 960×540.
+let SCALE = 1;
+function fitCanvas() {
+  const s = clamp(Math.round(devicePixelRatio * (canvas.clientWidth || W) / W * 4) / 4, 1, 2.5);
+  if (s === SCALE && canvas.width === Math.round(W * s)) return;
+  SCALE = s; canvas.width = Math.round(W * s); canvas.height = Math.round(H * s);
+  drawBackground();
+}
+addEventListener('resize', fitCanvas);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // ================= entrées : clavier, tactile, debug =================
@@ -336,8 +356,9 @@ function cloud(g, x, y, s) {
 }
 const bg = document.createElement('canvas');
 function drawBackground() {
-  bg.width = W; bg.height = H;
+  bg.width = Math.round(W * SCALE); bg.height = Math.round(H * SCALE);
   const g = bg.getContext('2d'), r = rnd(42);
+  g.setTransform(SCALE, 0, 0, SCALE, 0, 0);
   let gr = g.createLinearGradient(0, 0, 0, 200);
   gr.addColorStop(0, '#4fb6ff'); gr.addColorStop(1, '#bdeeff');
   g.fillStyle = gr; g.fillRect(0, 0, W, 200);
@@ -421,24 +442,18 @@ function drawShoe(p, col) {
   [-7, -1, 5].forEach((x) => { ctx.beginPath(); ctx.moveTo(x, -7); ctx.lineTo(x + 4, 3); ctx.stroke(); });
   ctx.restore();
 }
-function drawHead(img, x, y, f, h, tilt = 0) {
-  const ok = img.complete && img.naturalWidth;
-  const w = ok ? h * img.naturalWidth / img.naturalHeight : h * 0.75;
+function drawHead(head, x, y, f, h, tilt = 0) {
+  if (!head.sprite) return;
+  const k = h / SPRITE_H, sw = head.sprite.width * k, sh = head.sprite.height * k;
   ctx.save();
   ctx.translate(x, y); ctx.rotate(tilt); ctx.scale(f, 1);
-  ctx.beginPath(); ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, 7);
-  ctx.fillStyle = '#f6c9a0'; ctx.fill();
-  if (ok) ctx.drawImage(img, -w / 2, -h / 2, w, h);
-  ctx.lineWidth = 4.5; ctx.strokeStyle = OUTLINE; ctx.stroke();
-  // reflet cartoon
-  ctx.globalAlpha = 0.25; ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.ellipse(-w * 0.22, -h * 0.28, w * 0.1, h * 0.06, -0.6, 0, 7); ctx.fill();
+  ctx.drawImage(head.sprite, -sw / 2, -sh / 2, sw, sh);
   ctx.restore();
 }
 function drawPlayer(p) {
   const col = COLORS[p.i];
   drawShoe(p, col);
-  drawHead(HEADS[p.head].img, p.x, p.y - 2, p.f, 2 * R * 1.12, p.vx * 0.012 + (p.onGround ? 0 : p.f * p.vy * -0.006));
+  drawHead(HEADS[p.head], p.x, p.y - 2, p.f, 2 * R * 1.12, p.vx * 0.012 + (p.onGround ? 0 : p.f * p.vy * -0.006));
   // pastille du joueur
   ctx.font = '16px "Luckiest Guy", Impact, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   outlinedText(p.i === 0 ? 'J1' : 'J2', p.x, p.y - R - 22, col.main, 4);
@@ -470,8 +485,8 @@ const font = (s) => s + 'px "Luckiest Guy", Impact, sans-serif';
 function drawHud() {
   ctx.fillStyle = 'rgba(27,27,47,0.85)'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.roundRect(W / 2 - 170, 8, 340, 62, 16); ctx.fill(); ctx.stroke();
-  drawHead(HEADS[players[0].head].img, W / 2 - 138, 39, 1, 48);
-  drawHead(HEADS[players[1].head].img, W / 2 + 138, 39, -1, 48);
+  drawHead(HEADS[players[0].head], W / 2 - 138, 39, 1, 48);
+  drawHead(HEADS[players[1].head], W / 2 + 138, 39, -1, 48);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = font(40);
   outlinedText(String(score[0]), W / 2 - 78, 44, COLORS[0].main);
@@ -512,7 +527,7 @@ function drawSelect() {
       ctx.font = font(20);
       outlinedText((i === 0 ? 'J1' : 'J2') + (ready[i] ? ' ✔' : ''), x + (i === 0 ? -34 : 34), y - 98 - i * 7, ready[i] ? '#3ddc84' : COLORS[i].main, 5);
     });
-    drawHead(h.img, x, y - 8 + bob, 1, 120);
+    drawHead(h, x, y - 8 + bob, 1, 120);
     ctx.font = font(20); outlinedText(h.name, x, y + 76, '#fff', 5);
   });
   ctx.font = font(18);
@@ -523,9 +538,11 @@ function drawSelect() {
 }
 
 function render() {
+  ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+  ctx.imageSmoothingQuality = 'high';
   ctx.save();
   if (shake) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
-  ctx.drawImage(bg, 0, 0);
+  ctx.drawImage(bg, 0, 0, W, H);
   drawNet(true); drawNet(false);
   if (state !== 'select') {
     players.forEach((p) => shadow(p.x, p.y + R + 31));
@@ -560,11 +577,11 @@ function render() {
     ctx.font = font(76);
     if (win < 0) {
       outlinedText('ÉGALITÉ !', W / 2, 150, '#ffd93d', 12);
-      drawHead(HEADS[players[0].head].img, W / 2 - 110, 290, 1, 150);
-      drawHead(HEADS[players[1].head].img, W / 2 + 110, 290, -1, 150);
+      drawHead(HEADS[players[0].head], W / 2 - 110, 290, 1, 150);
+      drawHead(HEADS[players[1].head], W / 2 + 110, 290, -1, 150);
     } else {
       outlinedText('VICTOIRE !', W / 2, 140, COLORS[win].main, 12);
-      drawHead(HEADS[players[win].head].img, W / 2, 290 + Math.sin(frame / 8) * 8, 1, 190, Math.sin(frame / 12) * 0.1);
+      drawHead(HEADS[players[win].head], W / 2, 290 + Math.sin(frame / 8) * 8, 1, 190, Math.sin(frame / 12) * 0.1);
       ctx.font = font(36); outlinedText(HEADS[players[win].head].name, W / 2, 410, '#fff', 8);
     }
     ctx.font = font(44); outlinedText(score[0] + ' - ' + score[1], W / 2, 210, '#fff', 8);
@@ -574,7 +591,7 @@ function render() {
 }
 
 // ================= boucle =================
-drawBackground();
+fitCanvas(); drawBackground();
 document.fonts?.load(font(20)).then(drawBackground).catch(() => {});
 let acc = 0, last = performance.now();
 function loop(now) {
