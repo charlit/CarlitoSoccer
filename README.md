@@ -37,8 +37,11 @@ cd ~/CarlitoSoccer && git pull && docker build -t carlito-soccer . && docker rm 
 ```
 
 ```bash
-docker run -d --name carlito-soccer --restart unless-stopped -p 8083:80 carlito-soccer
+docker run -d --name carlito-soccer --restart unless-stopped -p 8086:80 carlito-soccer
 ```
 
-Le jeu répond alors sur le port **8083** du Mac mini. Ajoute la route (par ex. `/carlitosoccer/`) dans la page « Mes jeux » (conteneur `hub`).
+Le jeu répond alors sur le port **8086** du Mac mini (8081, 8082, 8083, 8085 et 8090 sont déjà pris).
+Il est publié par la page « Mes jeux » (conteneur `hub`, Caddy) sous
+`https://games-carlitos.tail736807.ts.net/carlitosoccer/` : route `handle_path /carlitosoccer/*` vers
+`host.docker.internal:8086` dans `~/hub/Caddyfile`, et lien dans `~/hub/site/index.html`.
 Le jeu n'utilise que des chemins relatifs, il marche donc sous n'importe quel sous-chemin.
