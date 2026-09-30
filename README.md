@@ -12,14 +12,13 @@ les joueurs en ligne (WebSocket).
 
 ## Contrôles
 
-**Au doigt (téléphone en paysage)**, comme dans Carlito Fighter : le pouce posé devient un joystick invisible,
-et deux boutons **SAUT** et **TIR** sont affichés.
+**Au doigt (téléphone en paysage), sans aucun bouton**, façon Brawl Stars : le pouce posé devient un joystick invisible.
 
 | | Solo / en ligne | 2 joueurs même écran |
 |---|---|---|
 | Courir | pouce gauche : glisser ◀ ▶ | glisser ◀ ▶ dans sa moitié d'écran |
-| Sauter | bouton SAUT (ou glisser le pouce vers le haut) | bouton SAUT de sa moitié (ou glisser vers le haut) |
-| Tirer | bouton TIR, en bas à droite | bouton TIR de sa moitié, vers le centre |
+| Sauter | glisser vers le haut (n'importe quel pouce) | glisser vers le haut |
+| Tirer | taper à droite (ou taper à gauche) | taper, ou poser un 2e doigt |
 
 **Au clavier** :
 

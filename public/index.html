@@ -131,23 +131,17 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => keysDown.delete(e.code));
 addEventListener('blur', () => keysDown.clear());
 
-// ---- tactile, comme Carlito Fighter ----
+// ---- tactile sans boutons, façon Brawl Stars ----
 // Le pouce posé devient le centre d'un joystick invisible (qui suit le pouce s'il va trop loin) :
-// glisser à gauche/droite = courir, glisser vers le haut = sauter. Deux boutons visibles : TIR et SAUT.
-// Solo / en ligne : boutons en bas à droite. 2 joueurs sur le même écran : une moitié d'écran chacun, boutons vers le centre.
+// glisser à gauche/droite = courir, glisser vers le haut = sauter, taper = tirer.
+// Solo / en ligne : moitié gauche = joystick, moitié droite = tirer (taper) ou sauter (glisser vers le haut).
+// 2 joueurs sur le même écran : chaque joueur a sa moitié d'écran (un 2e doigt dans sa moitié = tirer).
 let touchMode = matchMedia('(pointer: coarse)').matches;
 const touches = new Map();
 const IN_MATCH = ['countdown', 'play', 'goal'];
 function toCanvas(e) {
   const r = canvas.getBoundingClientRect();
   return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
-}
-function btnsOf(p) {
-  const cx = mode === 'local' ? (p === 0 ? W / 2 - 130 : W / 2 + 130) : W - 150;
-  return [
-    { k: 'jump', x: cx - 58, y: H - 62, r: 38, c: '#3ddc84', t: 'SAUT' },
-    { k: 'kick', x: cx + 58, y: H - 62, r: 42, c: '#ff3b3b', t: 'TIR' },
-  ];
 }
 document.addEventListener('pointerdown', (e) => {
   unlockAudio();
@@ -156,30 +150,36 @@ document.addEventListener('pointerdown', (e) => {
   const pt = toCanvas(e);
   if (!IN_MATCH.includes(state)) { uiTap(pt); return; }
   const p = mode === 'local' ? (pt.x < W / 2 ? 0 : 1) : me;
-  const b = btnsOf(p).find((q) => Math.hypot(pt.x - q.x, pt.y - q.y) < q.r + 12);
-  if (b) { (b.k === 'kick' ? queueKick : queueJump)(p); touches.set(e.pointerId, { p, role: 'btn', k: b.k }); return; }
   const hasStick = [...touches.values()].some((t) => t.p === p && t.role === 'stick');
-  touches.set(e.pointerId, { p, role: hasStick ? 'none' : 'stick', x0: pt.x, y0: pt.y, x: pt.x, y: pt.y, up: false });
+  const role = hasStick ? 'action' : mode === 'local' || pt.x < W / 2 ? 'stick' : 'action';
+  touches.set(e.pointerId, { p, role, x0: pt.x, y0: pt.y, x: pt.x, y: pt.y, t0: performance.now(), moved: 0, up: false });
+  if (role === 'action') queueKick(p);
 }, { passive: false });
 document.addEventListener('pointermove', (e) => {
   const t = touches.get(e.pointerId);
-  if (!t || t.role !== 'stick') return;
+  if (!t) return;
   const pt = toCanvas(e);
+  t.moved = Math.max(t.moved, Math.hypot(pt.x - t.x0, pt.y - t.y0));
   t.x = pt.x; t.y = pt.y;
   const dx = t.x - t.x0;
-  if (Math.abs(dx) > STICK) t.x0 = t.x - Math.sign(dx) * STICK;
+  if (t.role === 'stick' && Math.abs(dx) > STICK) t.x0 = t.x - Math.sign(dx) * STICK;
   const dy = t.y - t.y0;
   if (dy < -SWIPE_UP && !t.up) { t.up = true; queueJump(t.p); }
   else if (dy > -SWIPE_UP / 2 && t.up) { t.up = false; t.y0 = Math.min(t.y0, t.y + SWIPE_UP / 2); }
   if (t.up && dy < -SWIPE_UP * 2) t.y0 = t.y + SWIPE_UP * 2; // le pouce peut remonter sans fin
 });
-['pointerup', 'pointercancel'].forEach((ev) => document.addEventListener(ev, (e) => touches.delete(e.pointerId)));
+function endTouch(e) {
+  const t = touches.get(e.pointerId);
+  if (!t) return;
+  touches.delete(e.pointerId);
+  if (t.role === 'stick' && t.moved < 14 && performance.now() - t.t0 < 250 && IN_MATCH.includes(state)) queueKick(t.p);
+}
+['pointerup', 'pointercancel'].forEach((ev) => document.addEventListener(ev, endTouch));
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 function touchInput(i) {
   let x = 0, up = false, any = false;
   for (const t of touches.values()) {
     if (t.p !== i) continue;
-    if (t.role !== 'stick') continue;
     any = true;
     if (t.up) up = true;
     if (t.role === 'stick') { const dx = t.x - t.x0; x = Math.abs(dx) < 8 ? 0 : clamp(dx / (STICK * 0.6), -1, 1); }
@@ -849,17 +849,8 @@ function drawHud() {
   }
   if (mode === 'ai') { ctx.font = font(14); outlinedText('IA ' + AI_LEVELS[aiLevel].name, W / 2, 104, '#fff', 4); }
 }
-// boutons TIR / SAUT, et joystick fantôme visible seulement sous le pouce, pendant qu'on le tient
+// joystick fantôme : visible seulement sous le pouce, pendant qu'on le tient
 function drawTouches() {
-  if (!touchMode) return;
-  for (const i of mode === 'local' ? [0, 1] : [me]) for (const b of btnsOf(i)) {
-    const held = [...touches.values()].some((t) => t.role === 'btn' && t.p === i && t.k === b.k);
-    ctx.globalAlpha = held ? 0.8 : 0.45;
-    ctx.fillStyle = b.c; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
-    ctx.globalAlpha = 0.95; ctx.font = font(17); outlinedText(b.t, b.x, b.y + 2, '#fff', 4);
-  }
-  ctx.globalAlpha = 1;
   for (const t of touches.values()) {
     if (t.role !== 'stick') continue;
     const dx = clamp(t.x - t.x0, -STICK, STICK);
@@ -877,16 +868,16 @@ function drawTouchHelp() {
   ctx.globalAlpha = a;
   if (mode === 'local') {
     outlinedText('J1 : glisse ◀ ▶ pour courir', W / 4, 150, COLORS[0].main, 5);
-    outlinedText('boutons SAUT et TIR', W / 4, 176, '#fff', 5);
+    outlinedText('vers le haut = saut · tape = tir', W / 4, 176, '#fff', 5);
     outlinedText('J2 : glisse ◀ ▶ pour courir', W * 3 / 4, 150, COLORS[1].main, 5);
-    outlinedText('boutons SAUT et TIR', W * 3 / 4, 176, '#fff', 5);
+    outlinedText('vers le haut = saut · tape = tir', W * 3 / 4, 176, '#fff', 5);
     ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.setLineDash([10, 10]); ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(W / 2, 110); ctx.lineTo(W / 2, H); ctx.stroke(); ctx.setLineDash([]);
   } else {
     outlinedText('Pouce gauche : glisse ◀ ▶', W / 4, 150, '#fff', 5);
     outlinedText('vers le haut = saut', W / 4, 176, '#fff', 5);
-    outlinedText('Pouce droit : boutons', W * 3 / 4, 150, '#ffd93d', 5);
-    outlinedText('SAUT et TIR', W * 3 / 4, 176, '#fff', 5);
+    outlinedText('Pouce droit : tape = TIR', W * 3 / 4, 150, '#ffd93d', 5);
+    outlinedText('glisse vers le haut = saut', W * 3 / 4, 176, '#fff', 5);
   }
   ctx.globalAlpha = 1;
 }
@@ -1059,7 +1050,7 @@ if (DEBUG) {
     info: () => ({ state, mode, aiLevel, aiSlots: [...aiSlots], me, score: [...score], timeLeft, pick: [...pick], ready: [...ready], touchMode, endNote, waitMsg,
       net: net ? { role: net.role, ready: net.ws.readyState } : null }),
     ball: () => ball, players: () => players, ctl: () => ctl, footPos, touches: () => [...touches.values()],
-    pollLobby, lobby: () => lobby, btns: btnsOf,
+    pollLobby, lobby: () => lobby,
     setTime(s) { timeLeft = s; }, setPower(i, v) { players[i].power = v; }, setTouchMode(b) { touchMode = b; }, render,
   };
 }

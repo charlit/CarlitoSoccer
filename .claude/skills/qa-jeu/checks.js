@@ -300,41 +300,39 @@
       JSON.stringify({ 'difficile-moyen (buts)': d21, 'moyen-facile': d10, 'difficile contre immobile (buts pour-contre)': hard }));
   });
 
-  // 20. Tactile (solo) : pouce gauche = joystick invisible (glisser vers le haut = saut), boutons SAUT et TIR en bas à droite
+  // 20. Tactile façon Brawl Stars (solo) : pouce gauche = joystick invisible, glisser vers le haut = saut, pouce droit = tir
   await safe('tactile solo', () => {
     if (!cv.getBoundingClientRect().width) { check('tactile solo', false, 'canvas de taille 0 : panneau masqué, fais resize_window avant'); return; }
     g.start(0, 3, { mode: 'ai', ai: [null, 0] }); park();
-    const a = P()[0], [bj, bk] = g.btns(0);
+    const a = P()[0];
     finger('pointerdown', 21, 200, 420); finger('pointermove', 21, 260, 420); g.run(10);
     const vx = a.vx, cx = g.ctl()[0].x;
     finger('pointermove', 21, 260, 360); g.run(3);
     const jumped = a.vy < 0 && !a.onGround;
-    finger('pointerdown', 22, bk.x, bk.y); g.run(1);
+    finger('pointerdown', 22, 750, 300); g.run(1);
     const kick = a.kickT;
-    finger('pointerup', 22, bk.x, bk.y); finger('pointerup', 21, 260, 360);
+    finger('pointerup', 22, 750, 300); finger('pointerup', 21, 260, 360);
     const empty = g.touches().length === 0;
-    g.run(60); finger('pointerdown', 23, bj.x, bj.y); g.run(2); finger('pointerup', 23, bj.x, bj.y);
-    const btnJump = a.vy < 0 && !a.onGround;
-    finger('pointerdown', 24, 700, 250); g.run(1); const noTapKick = g.ctl()[0].kickQ === 0 && a.kickT === 0; finger('pointerup', 24, 700, 250);
-    check('tactile solo', cx === 1 && vx > 0 && jumped && kick >= 1 && empty && btnJump && noTapKick,
-      JSON.stringify({ joystickX: cx, vitesse: vx, saut: jumped, boutonTir: kick, doigtsRelaches: empty, boutonSaut: btnJump, tapHorsBoutonNeTirePas: noTapKick }));
+    g.run(40); finger('pointerdown', 23, 300, 400); finger('pointerup', 23, 300, 400); g.run(1);
+    const tapKick = a.kickT;
+    check('tactile solo', cx === 1 && vx > 0 && jumped && kick >= 1 && empty && tapKick >= 1,
+      JSON.stringify({ joystickX: cx, vitesse: vx, saut: jumped, tirPouceDroit: kick, doigtsRelaches: empty, tirTapeGauche: tapKick }));
   });
 
-  // 21. Tactile à 2 sur le même écran : chacun sa moitié et ses boutons, en même temps
+  // 21. Tactile à 2 sur le même écran : chacun sa moitié, en même temps
   await safe('tactile 2 joueurs', () => {
     if (!cv.getBoundingClientRect().width) { check('tactile 2 joueurs', false, 'canvas de taille 0'); return; }
     g.start(0, 3); park();
-    finger('pointerdown', 31, 200, 300); finger('pointerdown', 32, 760, 300);
-    finger('pointermove', 31, 150, 300); finger('pointermove', 32, 820, 300); g.run(2);
+    finger('pointerdown', 31, 200, 400); finger('pointerdown', 32, 760, 400);
+    finger('pointermove', 31, 150, 400); finger('pointermove', 32, 820, 400); g.run(2);
     const x = g.ctl().map((c) => c.x);
-    const bk = g.btns(1)[1];
-    finger('pointerdown', 33, bk.x, bk.y); g.run(1);
+    finger('pointerdown', 33, 850, 300); g.run(1);
     const k = P()[1].kickT;
     ['31', '32', '33'].forEach((id) => finger('pointerup', +id, 0, 0));
-    check('tactile 2 joueurs', x[0] < 0 && x[1] > 0 && k >= 1 && g.touches().length === 0, JSON.stringify({ J1x: x[0], J2x: x[1], tirJ2Bouton: k }));
+    check('tactile 2 joueurs', x[0] < 0 && x[1] > 0 && k >= 1 && g.touches().length === 0, JSON.stringify({ J1x: x[0], J2x: x[1], tirJ2DeuxiemeDoigt: k }));
   });
 
-  // 22. Menu au doigt
+  // 22. Pas de bouton : au doigt, on ne dessine rien d'autre qu'un joystick fantôme sous le pouce
   await safe('menu au doigt', () => {
     if (!cv.getBoundingClientRect().width) { check('menu au doigt', false, 'canvas de taille 0'); return; }
     g.toMenu(); finger('pointerdown', 41, C.W / 2, 138 + 3 * 66 + 27); finger('pointerup', 41, C.W / 2, 138 + 3 * 66 + 27);
@@ -387,7 +385,7 @@
     await until(() => g.info().state === 'play');
     const snap = g.info();
     key('keydown', 'ArrowLeft'); g.run(2); key('keyup', 'ArrowLeft');
-    if (cv.getBoundingClientRect().width) { const bk = g.btns(1)[1]; finger('pointerdown', 51, bk.x, bk.y); finger('pointerup', 51, bk.x, bk.y); }
+    if (cv.getBoundingClientRect().width) { finger('pointerdown', 51, 800, 300); finger('pointerup', 51, 800, 300); }
     g.run(2);
     await until(() => got.some((m) => m.t === 'in' && m.x < 0) && got.some((m) => m.t === 'in' && m.k >= 1));
     const inputs = got.filter((m) => m.t === 'in');
