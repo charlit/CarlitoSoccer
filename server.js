@@ -14,6 +14,12 @@ const PICKABLE = [0, 1, 2, 4, 5]; // têtes jouables (la 3, Le Boss, est réserv
 const server = http.createServer((req, res) => {
   let p;
   try { p = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch (e) { res.writeHead(400); return res.end(); }
+  // quelqu'un attend-il un adversaire en ligne ? (affiché sur l'accueil du jeu)
+  if (p === '/api/lobby') {
+    const w = waiting && waiting.readyState === 1;
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify({ waiting: !!w, head: w ? waiting.head : null }));
+  }
   if (p.endsWith('/')) p += 'index.html';
   const file = path.join(PUB, path.normalize(p));
   if (!file.startsWith(PUB + path.sep)) { res.writeHead(403); return res.end(); }

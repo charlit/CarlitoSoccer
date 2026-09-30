@@ -427,6 +427,23 @@
       JSON.stringify({ display: m.display, orientation: m.orientation, icones: icons, liens: links, iphone: !!meta }));
   });
 
+  // 27. Accueil : on voit si un joueur attend en ligne (api/lobby, relu toutes les 3 s sur le menu)
+  await safe('joueur en attente', async () => {
+    g.toMenu(); await g.pollLobby();
+    const avant = g.lobby();
+    const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+    const w = new WebSocket(url);
+    await until(() => w.readyState === 1);
+    w.send(JSON.stringify({ t: 'find', head: 5 })); await sleep(150);
+    await g.pollLobby();
+    const pendant = g.lobby();
+    w.close(); await sleep(150);
+    await g.pollLobby();
+    const apres = g.lobby();
+    check('joueur en attente', avant && !avant.waiting && pendant.waiting && pendant.head === 5 && !apres.waiting,
+      JSON.stringify({ avant, pendant, apres }));
+  });
+
   g.toMenu(); g.setTouchMode(false);
   return { total: results.length, echecs: results.filter((x) => !x.ok).length, results };
 })();

@@ -40,7 +40,7 @@ La QA teste le jeu **image par image** grâce au mode `?debug`. Le panneau navig
 
 ## 3. Suite de tests automatisés
 
-La suite est dans `checks.js`, à côté de ce fichier : 30 tests, dont 3 en ligne (la page se connecte au serveur,
+La suite est dans `checks.js`, à côté de ce fichier : 31 tests, dont 3 en ligne (la page se connecte au serveur,
 le test simule l'autre joueur avec son propre WebSocket). Le script est **asynchrone** :
 
 1. `cp .claude/skills/qa-jeu/checks.js public/__qa_checks_tmp.js` (fichier dans le `.gitignore`).
@@ -94,6 +94,8 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
   iPhone : impossible pour une page web, le menu affiche « Plein écran sur iPhone : Partager ⬆ puis Sur l'écran d'accueil »
   (seulement sur iOS hors app) ; lancé depuis l'icône, le jeu s'ouvre sans barre (manifest `display: fullscreen`, icône `icon-180.png`).
   Non testable ici sans vrai téléphone.
+- **Accueil** : si quelqu'un attend en ligne (`GET api/lobby` → `{ waiting, head }`, relu toutes les 3 s sur le menu),
+  le bouton devient « EN LIGNE · 1 JOUEUR ATTEND ! » avec un point vert qui clignote et la tête du joueur (« X t'attend ! ») à droite.
 - **Attente en ligne** : « Recherche d'un adversaire… », sa tête qui bouge, « Touche l'écran pour annuler ».
 
 ## 5. Ce qui n'est pas testable en local
@@ -105,7 +107,7 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
 
 ## 6. Rapport
 
-Termine par un résumé en français : résultat de la suite (X/30, détail des échecs), contrôles visuels faits
+Termine par un résumé en français : résultat de la suite (X/31, détail des échecs), contrôles visuels faits
 (capture si quelque chose a changé), bugs corrigés avec `fichier:ligne`, ce qui n'a pas pu être vérifié.
 
 Ne commite pas sans que l'utilisateur le demande.

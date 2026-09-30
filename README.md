@@ -5,6 +5,7 @@ Foot à grosses têtes façon *Head Soccer*, en style cartoon. Trois façons de 
 - **Contre l'IA** : facile, moyen ou difficile, l'IA joue toujours **Le Boss** (personnage réservé à l'IA) ;
 - **2 joueurs sur le même écran** (clavier ou un téléphone/tablette partagé) ;
 - **En ligne** : on attend qu'un autre joueur choisisse « En ligne », la partie démarre toute seule.
+  L'accueil affiche quand quelqu'un attend déjà (« EN LIGNE · 1 JOUEUR ATTEND ! » avec sa tête).
 
 Le jeu tient dans `public/index.html`, les visages dans `public/heads/`. `server.js` sert le jeu et met en relation
 les joueurs en ligne (WebSocket).

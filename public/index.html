@@ -295,7 +295,13 @@ function startMatch() {
   resetCtl(); touches.clear();
   kickoff(); state = 'countdown'; cd = 3 * 60 + 30; particles.length = 0;
 }
-function toMenu() { closeNet(); state = 'menu'; aiSlots[0] = aiSlots[1] = null; me = 0; particles.length = 0; touches.clear(); }
+function toMenu() { closeNet(); state = 'menu'; aiSlots[0] = aiSlots[1] = null; me = 0; particles.length = 0; touches.clear(); pollLobby(); }
+// Sur l'accueil, on demande au serveur toutes les 3 s si un joueur attend en ligne.
+let lobby = null;
+function pollLobby() {
+  return fetch('api/lobby', { cache: 'no-store' }).then((r) => r.json()).then((j) => { lobby = j; }).catch(() => { lobby = null; });
+}
+setInterval(() => { if (state === 'menu' && !document.hidden) pollLobby(); }, 3000);
 function toSelect() { state = 'select'; ready[0] = ready[1] = false; particles.length = 0; touches.clear(); }
 function chooseMenu(k) {
   const m = MENU[k]; menuSel = k;
@@ -888,7 +894,16 @@ function drawMenu() {
     const r = pillRect(k), sel = k === menuSel && !touchMode;
     ctx.fillStyle = sel ? m.c : 'rgba(27,27,47,0.85)'; ctx.strokeStyle = sel ? '#fff' : m.c; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 27); ctx.fill(); ctx.stroke();
-    ctx.font = font(26); outlinedText(m.label, W / 2, r.y + r.h / 2 + 2, sel ? '#fff' : m.c, 6);
+    const someone = m.mode === 'online' && lobby && lobby.waiting;
+    ctx.font = font(26); outlinedText(someone ? 'EN LIGNE · 1 JOUEUR ATTEND !' : m.label, W / 2, r.y + r.h / 2 + 2, sel ? '#fff' : m.c, 6);
+    if (someone) {
+      // point vert qui clignote + la tête de celui qui attend, à droite du bouton
+      ctx.globalAlpha = 0.6 + Math.sin(frame / 6) * 0.4; ctx.fillStyle = '#3ddc84'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(r.x + 30, r.y + r.h / 2, 9, 0, 7); ctx.fill(); ctx.stroke(); ctx.globalAlpha = 1;
+      const h = HEADS[lobby.head] || HEADS[0];
+      drawHead(h, r.x + r.w + 45, r.y + r.h / 2 + Math.sin(frame / 10) * 3, -1, 58);
+      ctx.font = font(15); outlinedText(h.name + ' t’attend !', r.x + r.w + 45, r.y + r.h + 10, '#3ddc84', 4);
+    }
   });
   if (!touchMode) { ctx.font = font(15); outlinedText('↑ ↓ pour choisir · Entrée pour valider', W / 2, 482, '#fff', 4); }
   else if (IS_IOS && !IS_APP) { ctx.font = font(16); outlinedText('Plein écran sur iPhone : bouton Partager ⬆ puis « Sur l’écran d’accueil »', W / 2, 482, '#ffd93d', 4); }
@@ -1035,6 +1050,7 @@ if (DEBUG) {
     info: () => ({ state, mode, aiLevel, aiSlots: [...aiSlots], me, score: [...score], timeLeft, pick: [...pick], ready: [...ready], touchMode, endNote, waitMsg,
       net: net ? { role: net.role, ready: net.ws.readyState } : null }),
     ball: () => ball, players: () => players, ctl: () => ctl, footPos, touches: () => [...touches.values()],
+    pollLobby, lobby: () => lobby,
     setTime(s) { timeLeft = s; }, setPower(i, v) { players[i].power = v; }, setTouchMode(b) { touchMode = b; }, render,
   };
 }
