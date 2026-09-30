@@ -36,12 +36,13 @@ const OUTLINE = '#1b1b2f';
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
 // Pour renommer un personnage, change son nom ici.
+// flip: true = la photo regarde vers la gauche : on la retourne pour que le joueur regarde vers l'avant.
 const HEADS = [
-  { src: 'heads/p1.png', name: 'Carlito' },
+  { src: 'heads/p1.png', name: 'Carlito', flip: true },
   { src: 'heads/p2.png', name: 'Moustache' },
-  { src: 'heads/p3.png', name: 'Nono' },
+  { src: 'heads/p3.png', name: 'Nono', flip: true },
   { src: 'heads/p4.png', name: 'Le Boss', boss: true }, // réservé à l'IA : on ne peut pas le choisir
-  { src: 'heads/p5.png', name: 'Éclipse' },
+  { src: 'heads/p5.png', name: 'Éclipse', flip: true },
 ];
 // Chaque tête détourée reçoit un contour noir cartoon qui suit sa silhouette (calculé une fois au chargement).
 const SPRITE_H = 360, SPRITE_O = 13;
@@ -692,7 +693,7 @@ function drawHead(head, x, y, f, h, tilt = 0) {
   if (!head.sprite) return;
   const k = h / SPRITE_H, sw = head.sprite.width * k, sh = head.sprite.height * k;
   ctx.save();
-  ctx.translate(x, y); ctx.rotate(tilt); ctx.scale(f, 1);
+  ctx.translate(x, y); ctx.rotate(tilt); ctx.scale(head.flip ? -f : f, 1);
   ctx.drawImage(head.sprite, -sw / 2, -sh / 2, sw, sh);
   ctx.restore();
 }
