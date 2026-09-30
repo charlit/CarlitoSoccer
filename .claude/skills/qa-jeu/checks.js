@@ -15,7 +15,7 @@
   const park = () => Object.assign(B(), { x: C.W / 2, y: 60, vx: 0, vy: 0 }); // balle loin des joueurs
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const until = async (cond, ms = 3000) => { const t = Date.now(); while (!cond() && Date.now() - t < ms) await sleep(30); return cond(); };
-  const cardX = (k) => C.W / 2 + (k - (g.heads.length - 1) / 2) * 150;
+  const cardX = (j) => C.W / 2 + (j - (g.pickable.length - 1) / 2) * 150; // j = rang de la carte (Le Boss n'a pas de carte)
   const cv = document.getElementById('c');
   // doigt simulé : coordonnées du jeu (960×540) → coordonnées écran
   const finger = (type, id, x, y) => {
@@ -54,7 +54,7 @@
     const s1 = g.info().state;
     g.run(4 * 60);
     const s2 = g.info().state;
-    check('sélection 2 joueurs', mid.pick[0] === (p0 + 1) % 5 && mid.ready[0] && !mid.ready[1] && mid.state === 'select' && s1 === 'countdown' && s2 === 'play',
+    check('sélection 2 joueurs', mid.pick[0] === g.pickable[(g.pickable.indexOf(p0) + 1) % g.pickable.length] && mid.ready[0] && !mid.ready[1] && mid.state === 'select' && s1 === 'countdown' && s2 === 'play',
       JSON.stringify({ p0, pick: mid.pick, ready: mid.ready, s1, s2 }));
   });
 
@@ -62,7 +62,7 @@
   await safe('sélection au doigt', () => {
     g.chooseMenu(3); g.tap(cardX(1), 250);
     const a = g.info();
-    g.tap(cardX(4), 250);
+    g.tap(cardX(3), 250);
     const b = g.info();
     check('sélection au doigt', a.ready[0] && !a.ready[1] && a.state === 'select' && b.state === 'countdown' && b.pick.join() === '1,4', JSON.stringify({ apresJ1: a.ready, final: [b.state, b.pick] }));
   });
@@ -71,7 +71,18 @@
   await safe('sélection IA', () => {
     g.chooseMenu(1); g.tap(cardX(2), 250);
     const i = g.info();
-    check('sélection IA', i.state === 'countdown' && i.pick[0] === 2 && i.pick[1] !== 2 && i.aiSlots.join() === ',1' && i.me === 0, JSON.stringify(i));
+    check('sélection IA', i.state === 'countdown' && i.pick[0] === 2 && i.pick[1] === g.boss && i.aiSlots.join() === ',1' && i.me === 0, JSON.stringify(i));
+  });
+
+  // 5b. Le Boss est réservé à l'IA : jamais proposé au clavier ni au doigt, toujours joué par l'IA
+  await safe('Le Boss réservé à l’IA', () => {
+    g.chooseMenu(3); const seen = new Set();
+    for (let n = 0; n < 8; n++) { g.key('KeyD'); g.key('ArrowRight'); const pk = g.info().pick; seen.add(pk[0]); seen.add(pk[1]); }
+    const taps = []; for (let j = 0; j < 6; j++) { g.chooseMenu(1); g.tap(cardX(j), 250); taps.push(g.info().pick[0]); }
+    const cartes = g.pickable.length;
+    g.toMenu();
+    check('Le Boss réservé à l’IA', !seen.has(g.boss) && seen.size === 4 && !taps.includes(g.boss) && cartes === 4 && g.heads[g.boss].name === 'Le Boss',
+      JSON.stringify({ tetesProposees: [...seen].sort(), tapsCartes: taps, cartes, boss: g.heads[g.boss].name }));
   });
 
   // 6. Déplacement indépendant des deux joueurs, et murs
@@ -225,7 +236,7 @@
   // 19. IA : les niveaux sont bien ordonnés (difficile > moyen > facile), et l'IA marque contre un joueur immobile
   await safe('IA niveaux', () => {
     // buts cumulés sur 12 matchs, en changeant de côté à chaque match (les victoires seules sont trop aléatoires)
-    const duel = (a, b, n) => { let ga = 0, gb = 0; for (let m = 0; m < n; m++) { const sw = m % 2; g.start(m % 5, (m + 2) % 5, { mode: 'ai', ai: sw ? [b, a] : [a, b] }); g.run(62 * 60); const s = g.info().score; ga += sw ? s[1] : s[0]; gb += sw ? s[0] : s[1]; } return [ga, gb]; };
+    const duel = (a, b, n) => { let ga = 0, gb = 0; for (let m = 0; m < n; m++) { const sw = m % 2; g.start(g.pickable[m % 4], g.boss, { mode: 'ai', ai: sw ? [b, a] : [a, b] }); g.run(62 * 60); const s = g.info().score; ga += sw ? s[1] : s[0]; gb += sw ? s[0] : s[1]; } return [ga, gb]; };
     const d21 = duel(2, 1, 12), d10 = duel(1, 0, 12);
     let hard = [0, 0]; for (let m = 0; m < 2; m++) { g.start(0, 3, { mode: 'ai', ai: [null, 2] }); g.run(62 * 60); const s = g.info().score; hard[0] += s[1]; hard[1] += s[0]; }
     check('IA niveaux', d21[0] > d21[1] && d10[0] > d10[1] && hard[0] >= 3 && hard[0] > hard[1],
@@ -339,12 +350,14 @@
     const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
     const a = new WebSocket(url), b = new WebSocket(url); const got = [];
     b.onmessage = (e) => got.push(JSON.parse(e.data));
+    a.onmessage = (e) => got.push({ de: 'a', ...JSON.parse(e.data) });
     await until(() => a.readyState === 1 && b.readyState === 1);
-    a.send(JSON.stringify({ t: 'find', head: 1 })); await sleep(100); b.send(JSON.stringify({ t: 'find', head: 2 }));
+    // a demande Le Boss (tête 3) : le serveur le refuse et lui donne la tête 0
+    a.send(JSON.stringify({ t: 'find', head: 3 })); await sleep(100); b.send(JSON.stringify({ t: 'find', head: 2 }));
     await until(() => got.some((m) => m.t === 'start'));
     const st = got.find((m) => m.t === 'start');
     a.close(); b.close();
-    check('en ligne (annuler)', s.state === 'menu' && !s.net && st && st.heads.join() === '1,2', JSON.stringify({ apresAnnulation: s.state, nouvellePartieEntreAutres: st && st.heads }));
+    check('en ligne (annuler)', s.state === 'menu' && !s.net && st && st.heads.join() === '0,2', JSON.stringify({ apresAnnulation: s.state, net: s.net, nouvellePartieEntreAutres: st && st.heads, recu: got }));
   });
 
   g.toMenu(); g.setTouchMode(false);

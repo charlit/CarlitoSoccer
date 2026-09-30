@@ -40,7 +40,7 @@ La QA teste le jeu **image par image** grâce au mode `?debug`. Le panneau navig
 
 ## 3. Suite de tests automatisés
 
-La suite est dans `checks.js`, à côté de ce fichier : 25 tests, dont 3 en ligne (la page se connecte au serveur,
+La suite est dans `checks.js`, à côté de ce fichier : 26 tests, dont 3 en ligne (la page se connecte au serveur,
 le test simule l'autre joueur avec son propre WebSocket). Le script est **asynchrone** :
 
 1. `cp .claude/skills/qa-jeu/checks.js public/__qa_checks_tmp.js` (fichier dans le `.gitignore`).
@@ -59,6 +59,7 @@ un test pour chaque nouveau bug trouvé. Piège connu : pendant un `await sleep(
 
 Règles de jeu que la suite protège :
 - Menu : IA facile / moyen / difficile, 2 joueurs même écran, en ligne. Clavier (↑ ↓ Entrée) et doigt.
+- **Le Boss** (tête 3) est réservé à l'IA : jamais proposé (4 cartes), toujours joué par l'IA en facile/moyen/difficile, refusé par le serveur en ligne.
 - 2 joueurs : chacun choisit et se déclare prêt (clavier), ou au doigt J1 touche sa tête puis J2. Solo et en ligne : une seule tête à toucher.
 - En solo, ZQSD **et** les flèches contrôlent mon joueur. À 2, ZQSD = J1, flèches = J2.
 - Physique : saut au-dessus de la barre, un appui = un seul tir (≥ 12 px/image), tête qui renvoie la balle, but seulement sous la barre,
@@ -93,7 +94,7 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
 
 ## 6. Rapport
 
-Termine par un résumé en français : résultat de la suite (X/25, détail des échecs), contrôles visuels faits
+Termine par un résumé en français : résultat de la suite (X/26, détail des échecs), contrôles visuels faits
 (capture si quelque chose a changé), bugs corrigés avec `fichier:ligne`, ce qui n'a pas pu être vérifié.
 
 Ne commite pas sans que l'utilisateur le demande.

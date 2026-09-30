@@ -9,7 +9,7 @@ const { WebSocketServer } = require('ws');
 const PORT = process.env.PORT || 8080;
 const PUB = path.join(__dirname, 'public');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
-const HEADS = 5;
+const PICKABLE = [0, 1, 2, 4]; // têtes jouables (la 3, Le Boss, est réservée à l'IA) : même liste que PICKABLE dans index.html
 
 const server = http.createServer((req, res) => {
   let p;
@@ -38,7 +38,7 @@ wss.on('connection', (ws) => {
     let m;
     try { m = JSON.parse(txt); } catch (e) { return; }
     if (m.t === 'find' && !ws.peer) {
-      ws.head = Math.min(HEADS - 1, Math.max(0, m.head | 0));
+      ws.head = PICKABLE.includes(m.head) ? m.head : PICKABLE[0];
       if (waiting && waiting !== ws && waiting.readyState === 1) {
         const host = waiting; waiting = null;
         host.peer = ws; ws.peer = host;

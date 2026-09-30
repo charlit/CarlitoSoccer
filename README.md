@@ -2,7 +2,7 @@
 
 Foot à grosses têtes façon *Head Soccer*, en style cartoon. Trois façons de jouer :
 
-- **Contre l'IA** : facile, moyen ou difficile ;
+- **Contre l'IA** : facile, moyen ou difficile, l'IA joue toujours **Le Boss** (personnage réservé à l'IA) ;
 - **2 joueurs sur le même écran** (clavier ou un téléphone/tablette partagé) ;
 - **En ligne** : on attend qu'un autre joueur choisisse « En ligne », la partie démarre toute seule.
 

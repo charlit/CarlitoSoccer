@@ -40,7 +40,7 @@ const HEADS = [
   { src: 'heads/p1.png', name: 'Carlito' },
   { src: 'heads/p2.png', name: 'Moustache' },
   { src: 'heads/p3.png', name: 'Nono' },
-  { src: 'heads/p4.png', name: 'Le Boss' },
+  { src: 'heads/p4.png', name: 'Le Boss', boss: true }, // réservé à l'IA : on ne peut pas le choisir
   { src: 'heads/p5.png', name: 'Éclipse' },
 ];
 // Chaque tête détourée reçoit un contour noir cartoon qui suit sa silhouette (calculé une fois au chargement).
@@ -55,6 +55,9 @@ function makeSprite(img) {
   return c;
 }
 HEADS.forEach((h) => { h.img = new Image(); h.img.onload = () => { h.sprite = makeSprite(h.img); }; h.img.src = h.src; });
+const BOSS = HEADS.findIndex((h) => h.boss);
+const PICKABLE = HEADS.map((_, k) => k).filter((k) => k !== BOSS); // têtes proposées aux joueurs
+const nextPick = (h, d) => PICKABLE[(PICKABLE.indexOf(h) + d + PICKABLE.length) % PICKABLE.length];
 const COLORS = [{ main: '#ff3b3b', dark: '#b3151c' }, { main: '#2f7bff', dark: '#1543a8' }];
 
 const canvas = document.getElementById('c');
@@ -88,7 +91,7 @@ const MENU = [
   { label: 'EN LIGNE', mode: 'online', c: '#ff7ad9' },
 ];
 const pillRect = (k) => ({ x: W / 2 - 240, y: 138 + k * 66, w: 480, h: 54 });
-const cardX = (k) => W / 2 + (k - (HEADS.length - 1) / 2) * 150;
+const cardX = (j) => W / 2 + (j - (PICKABLE.length - 1) / 2) * 150; // j = rang dans PICKABLE
 let menuSel = 0;
 
 // ================= entrées =================
@@ -260,7 +263,7 @@ let state = 'menu';        // menu | select | wait | countdown | play | goal | e
 let frame = 0, cd = 0, goalT = 0, endT = 0, shake = 0, lastScorer = -1, endNote = '', waitMsg = '';
 let timeLeft = MATCH_TIME;
 const score = [0, 0];
-const pick = [0, 3], ready = [false, false];
+const pick = [0, 4], ready = [false, false];
 const players = [0, 1].map((i) => ({ i, f: i === 0 ? 1 : -1, x: 0, y: REST_Y, vx: 0, vy: 0, onGround: true, kickT: 0, head: pick[i] }));
 const ball = { x: W / 2, y: 150, vx: 0, vy: 0, r: BALL_R, rot: 0 };
 const particles = [];
@@ -289,8 +292,7 @@ function confirmSolo() {
   sfx.tick();
   if (mode === 'ai') {
     me = 0; aiSlots[0] = null; aiSlots[1] = aiLevel;
-    const others = HEADS.map((_, k) => k).filter((k) => k !== pick[0]);
-    pick[1] = others[(Math.random() * others.length) | 0];
+    pick[1] = BOSS; // l'IA joue toujours Le Boss
     startMatch();
   } else goOnline();
 }
@@ -313,14 +315,14 @@ function uiKey(code) {
     if (mode === 'local') {
       for (const i of [0, 1]) {
         const m = KEYMAP[i];
-        if (!ready[i] && m.left.includes(code)) { pick[i] = (pick[i] + HEADS.length - 1) % HEADS.length; sfx.tick(); }
-        if (!ready[i] && m.right.includes(code)) { pick[i] = (pick[i] + 1) % HEADS.length; sfx.tick(); }
+        if (!ready[i] && m.left.includes(code)) { pick[i] = nextPick(pick[i], -1); sfx.tick(); }
+        if (!ready[i] && m.right.includes(code)) { pick[i] = nextPick(pick[i], 1); sfx.tick(); }
         if (m.kick.includes(code) || m.jump.includes(code)) { ready[i] = !ready[i]; sfx.tick(); }
       }
       if (ready[0] && ready[1]) startMatch();
     } else {
-      if (left) { pick[0] = (pick[0] + HEADS.length - 1) % HEADS.length; sfx.tick(); }
-      if (right) { pick[0] = (pick[0] + 1) % HEADS.length; sfx.tick(); }
+      if (left) { pick[0] = nextPick(pick[0], -1); sfx.tick(); }
+      if (right) { pick[0] = nextPick(pick[0], 1); sfx.tick(); }
       if (ok || up || down) confirmSolo();
     }
   } else if (state === 'end') {
@@ -334,8 +336,9 @@ function uiTap(pt) {
     MENU.forEach((_, k) => { if (inR(pillRect(k))) chooseMenu(k); });
   } else if (state === 'select') {
     if (inR({ x: 0, y: 0, w: 150, h: 56 })) { sfx.tick(); toMenu(); return; }
-    const k = HEADS.findIndex((_, j) => Math.abs(pt.x - cardX(j)) < 68 && pt.y > 160 && pt.y < 360);
-    if (k < 0) return;
+    const j = PICKABLE.findIndex((_, jj) => Math.abs(pt.x - cardX(jj)) < 68 && pt.y > 160 && pt.y < 360);
+    if (j < 0) return;
+    const k = PICKABLE[j];
     if (mode === 'local') {
       const i = ready[0] ? 1 : 0;
       pick[i] = k; ready[i] = true; sfx.tick();
@@ -795,10 +798,10 @@ function drawMenu() {
 function drawSelect() {
   dim(); drawTitle();
   ctx.font = font(18); outlinedText('← MENU', 70, 28, '#fff', 5);
-  const sub = mode === 'local' ? 'Choisissez vos têtes !' : mode === 'ai' ? 'Choisis ta tête · IA ' + AI_LEVELS[aiLevel].name : 'Choisis ta tête · En ligne';
+  const sub = mode === 'local' ? 'Choisissez vos têtes !' : mode === 'ai' ? 'Choisis ta tête · contre ' + HEADS[BOSS].name + ' (IA ' + AI_LEVELS[aiLevel].name + ')' : 'Choisis ta tête · En ligne';
   ctx.font = font(22); outlinedText(sub, W / 2, 125, '#fff', 5);
-  HEADS.forEach((h, k) => {
-    const x = cardX(k), y = 250;
+  PICKABLE.forEach((k, j) => {
+    const h = HEADS[k], x = cardX(j), y = 250;
     const bob = Math.sin(frame / 20 + k) * 4;
     ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.roundRect(x - 64, y - 82, 128, 180, 18); ctx.fill();
     const who = mode === 'local' ? [0, 1] : [0];
@@ -912,7 +915,7 @@ requestAnimationFrame(loop);
 if (DEBUG) {
   window.__hb = {
     consts: { W, H, GROUND, R, FOOT_R, REST_Y, GOAL_W, BAR_Y, BAR_H, BALL_R, MATCH_TIME, KICK_LEN, STICK, SWIPE_UP },
-    heads: HEADS, menu: MENU, aiLevels: AI_LEVELS,
+    heads: HEADS, pickable: PICKABLE, boss: BOSS, menu: MENU, aiLevels: AI_LEVELS,
     // start(a, b, { mode, ai: [niveau J1, niveau J2] }) : match direct, compte à rebours sauté
     start(a = 0, b = 3, o = {}) {
       toMenu(); mode = o.mode || 'local'; pick[0] = a; pick[1] = b;
