@@ -5,7 +5,7 @@ description: QA de Carlito Soccer (le jeu de foot à grosses têtes de ce repo :
 
 # QA Carlito Soccer
 
-- `public/index.html` : tout le jeu (canvas 960×540, rendu à la densité de l'écran). Visages dans `public/heads/p1.png` … `p5.png`,
+- `public/index.html` : tout le jeu (canvas 960×540, rendu à la densité de l'écran). Visages dans `public/heads/p1.png` … `p6.png`,
   liste et noms dans le tableau `HEADS`.
 - `server.js` : sert le jeu **et** fait la mise en relation en ligne (WebSocket sur `…/ws`, dépendance `ws`).
   Le 1er joueur qui cherche attend ; le 2e lance la partie. L'hôte (role 0, J1 rouge) fait tourner la partie et envoie
@@ -59,7 +59,7 @@ un test pour chaque nouveau bug trouvé. Piège connu : pendant un `await sleep(
 
 Règles de jeu que la suite protège :
 - Menu : IA facile / moyen / difficile, 2 joueurs même écran, en ligne. Clavier (↑ ↓ Entrée) et doigt.
-- **Le Boss** (tête 3) est réservé à l'IA : jamais proposé (4 cartes), toujours joué par l'IA en facile/moyen/difficile, refusé par le serveur en ligne.
+- **Le Boss** (tête 3) est réservé à l'IA : jamais proposé (5 cartes), toujours joué par l'IA en facile/moyen/difficile, refusé par le serveur en ligne.
 - 2 joueurs : chacun choisit et se déclare prêt (clavier), ou au doigt J1 touche sa tête puis J2. Solo et en ligne : une seule tête à toucher.
 - En solo, ZQSD **et** les flèches contrôlent mon joueur. À 2, ZQSD = J1, flèches = J2.
 - Physique : saut au-dessus de la barre, un appui = un seul tir (≥ 12 px/image), tête qui renvoie la balle, but seulement sous la barre,

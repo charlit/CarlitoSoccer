@@ -28,7 +28,7 @@
   // 1. Les 5 visages sont chargés et détourés
   await safe('visages', () => {
     const bad = g.heads.filter((h) => !(h.img.complete && h.img.naturalWidth > 0 && h.sprite)).map((h) => h.src);
-    check('visages', g.heads.length === 5 && bad.length === 0, bad.length ? 'non chargés : ' + bad.join(', ') : '5 visages chargés et détourés avec contour');
+    check('visages', g.heads.length === 6 && bad.length === 0, bad.length ? 'non chargés : ' + bad.join(', ') : '6 visages chargés et détourés avec contour');
   });
 
   // 2. Menu : 5 modes, navigation au clavier et au doigt
@@ -81,7 +81,7 @@
     const taps = []; for (let j = 0; j < 6; j++) { g.chooseMenu(1); g.tap(cardX(j), 250); taps.push(g.info().pick[0]); }
     const cartes = g.pickable.length;
     g.toMenu();
-    check('Le Boss réservé à l’IA', !seen.has(g.boss) && seen.size === 4 && !taps.includes(g.boss) && cartes === 4 && g.heads[g.boss].name === 'Le Boss',
+    check('Le Boss réservé à l’IA', !seen.has(g.boss) && seen.size === 5 && !taps.includes(g.boss) && cartes === 5 && g.heads[g.boss].name === 'Le Boss',
       JSON.stringify({ tetesProposees: [...seen].sort(), tapsCartes: taps, cartes, boss: g.heads[g.boss].name }));
   });
 
