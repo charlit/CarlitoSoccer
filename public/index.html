@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carlito Soccer">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
 <meta name="theme-color" content="#1a1f3a">
 <title>Carlito Soccer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -331,7 +337,18 @@ function uiKey(code) {
   }
 }
 // ---- menus : toucher / souris ----
+// Plein écran au premier toucher sur téléphone (Android). Safari sur iPhone ne le permet pas aux pages web :
+// là-bas il faut « Sur l'écran d'accueil » (le manifest ouvre alors le jeu sans barre du navigateur).
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IS_APP = navigator.standalone || matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
+function goFullscreen() {
+  if (!touchMode || document.fullscreenElement || !document.fullscreenEnabled) return;
+  document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+    .then(() => screen.orientation?.lock?.('landscape'))
+    .catch(() => { /* refusé par le navigateur : on joue sans */ });
+}
 function uiTap(pt) {
+  goFullscreen();
   const inR = (r) => pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.y && pt.y <= r.y + r.h;
   if (state === 'menu') {
     MENU.forEach((_, k) => { if (inR(pillRect(k))) chooseMenu(k); });
@@ -795,6 +812,7 @@ function drawMenu() {
     ctx.font = font(26); outlinedText(m.label, W / 2, r.y + r.h / 2 + 2, sel ? '#fff' : m.c, 6);
   });
   if (!touchMode) { ctx.font = font(15); outlinedText('↑ ↓ pour choisir · Entrée pour valider', W / 2, 482, '#fff', 4); }
+  else if (IS_IOS && !IS_APP) { ctx.font = font(16); outlinedText('Plein écran sur iPhone : bouton Partager ⬆ puis « Sur l’écran d’accueil »', W / 2, 482, '#ffd93d', 4); }
 }
 function drawSelect() {
   dim(); drawTitle();

@@ -360,6 +360,16 @@
     check('en ligne (annuler)', s.state === 'menu' && !s.net && st && st.heads.join() === '0,2', JSON.stringify({ apresAnnulation: s.state, net: s.net, nouvellePartieEntreAutres: st && st.heads, recu: got }));
   });
 
+  // 26. Plein écran sur téléphone : manifest « fullscreen » + icônes (iPhone : écran d'accueil), liens dans la page
+  await safe('plein écran', async () => {
+    const m = await fetch('manifest.json', { cache: 'no-store' }).then((r) => r.json());
+    const icons = await Promise.all(['icon-180.png', 'icon-192.png', 'icon-512.png'].map((f) => fetch(f, { cache: 'no-store' }).then((r) => r.status)));
+    const links = ['manifest', 'apple-touch-icon'].every((rel) => document.querySelector('link[rel="' + rel + '"]'));
+    const meta = document.querySelector('meta[name="apple-mobile-web-app-capable"]');
+    check('plein écran', m.display === 'fullscreen' && m.orientation === 'landscape' && icons.every((c) => c === 200) && links && meta,
+      JSON.stringify({ display: m.display, orientation: m.orientation, icones: icons, liens: links, iphone: !!meta }));
+  });
+
   g.toMenu(); g.setTouchMode(false);
   return { total: results.length, echecs: results.filter((x) => !x.ok).length, results };
 })();

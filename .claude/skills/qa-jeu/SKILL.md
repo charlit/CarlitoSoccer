@@ -40,7 +40,7 @@ La QA teste le jeu **image par image** grâce au mode `?debug`. Le panneau navig
 
 ## 3. Suite de tests automatisés
 
-La suite est dans `checks.js`, à côté de ce fichier : 26 tests, dont 3 en ligne (la page se connecte au serveur,
+La suite est dans `checks.js`, à côté de ce fichier : 27 tests, dont 3 en ligne (la page se connecte au serveur,
 le test simule l'autre joueur avec son propre WebSocket). Le script est **asynchrone** :
 
 1. `cp .claude/skills/qa-jeu/checks.js public/__qa_checks_tmp.js` (fichier dans le `.gitignore`).
@@ -83,6 +83,10 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
   Pendant le compte à rebours, l'aide (« Pouce gauche… / Pouce droit… », ou une par moitié à 2 avec la ligne pointillée)
   est dans les tribunes, sans cacher les joueurs. Un doigt posé montre un cercle fantôme et un point de la couleur du joueur.
   Remets ensuite le preset `desktop`.
+- **Plein écran téléphone** : Android passe en plein écran (et verrouille le paysage) au 1er toucher dans un menu (`goFullscreen`).
+  iPhone : impossible pour une page web, le menu affiche « Plein écran sur iPhone : Partager ⬆ puis Sur l'écran d'accueil »
+  (seulement sur iOS hors app) ; lancé depuis l'icône, le jeu s'ouvre sans barre (manifest `display: fullscreen`, icône `icon-180.png`).
+  Non testable ici sans vrai téléphone.
 - **Attente en ligne** : « Recherche d'un adversaire… », sa tête qui bouge, « Touche l'écran pour annuler ».
 
 ## 5. Ce qui n'est pas testable en local
@@ -94,7 +98,7 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
 
 ## 6. Rapport
 
-Termine par un résumé en français : résultat de la suite (X/26, détail des échecs), contrôles visuels faits
+Termine par un résumé en français : résultat de la suite (X/27, détail des échecs), contrôles visuels faits
 (capture si quelque chose a changé), bugs corrigés avec `fichier:ligne`, ce qui n'a pas pu être vérifié.
 
 Ne commite pas sans que l'utilisateur le demande.
