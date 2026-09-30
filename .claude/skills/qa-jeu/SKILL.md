@@ -1,6 +1,6 @@
 ---
 name: qa-jeu
-description: QA de Carlito Soccer (le jeu de foot à grosses têtes de ce repo : contre l'IA à 3 niveaux, à 2 sur le même écran, ou en ligne) — lance la suite de tests automatisés (menu, sélection des têtes, physique, buts, barre, fin de match, niveaux d'IA, tactile sans boutons façon Brawl Stars, mode en ligne hôte/invité) via le mode ?debug, vérifie le rendu desktop et mobile paysage, puis corrige et re-teste. Utiliser quand on demande « qa », « teste le jeu », « vérifie que ça marche », ou après toute modification de public/index.html ou server.js.
+description: QA de Carlito Soccer (le jeu de foot à grosses têtes de ce repo : contre l'IA à 3 niveaux, à 2 sur le même écran, ou en ligne) — lance la suite de tests automatisés (menu, sélection des têtes, physique, buts, barre, fin de match, niveaux d'IA, tactile joystick + boutons SAUT/TIR, mode en ligne hôte/invité) via le mode ?debug, vérifie le rendu desktop et mobile paysage, puis corrige et re-teste. Utiliser quand on demande « qa », « teste le jeu », « vérifie que ça marche », ou après toute modification de public/index.html ou server.js.
 ---
 
 # QA Carlito Soccer
@@ -35,6 +35,7 @@ La QA teste le jeu **image par image** grâce au mode `?debug`. Le panneau navig
 | `press(p, k)` / `release(p, k)` / `releaseAll()` | Joueur `p` (0 = J1, 1 = J2), touche `left`, `right`, `jump`, `kick` |
 | `info()` | `{ state, mode, aiLevel, aiSlots, me, score, timeLeft, pick, ready, touchMode, endNote, waitMsg, net }` — `state` : `menu`, `select`, `wait`, `countdown`, `play`, `goal`, `end` |
 | `ball()` / `players()` / `ctl()` / `touches()` | Objets du jeu ; `ctl()` = commandes unifiées de chaque joueur (`x`, `jump`, `kickQ`, `sentK`, `seenK`…) |
+| `btns(p)` | Boutons tactiles SAUT / TIR du joueur `p` (`{ k, x, y, r }`) |
 | `footPos(p)` / `setTime(s)` / `setTouchMode(b)` / `render()` | Chaussure, chrono, mode tactile (aides à l'écran), redessin (obligatoire avant une capture si le panneau est masqué) |
 | `consts` / `heads` / `menu` / `aiLevels` | Constantes (`W`, `GROUND`, `R`, `GOAL_W`, `BAR_Y`, `STICK`, `SWIPE_UP`…), têtes, menu, réglages de l'IA |
 
@@ -71,9 +72,9 @@ Règles de jeu que la suite protège :
 - Fin du match (60 s) : appuis ignorés 1 s ; ensuite retour au choix des têtes (menu en ligne).
 - **IA** : difficile > moyen > facile en buts cumulés sur 16 matchs, et l'IA difficile bat un joueur immobile.
   Bug historique : l'IA qui court vers son but à travers la balle marque contre son camp → elle saute par-dessus.
-- **Tactile sans aucun bouton** (façon Brawl Stars) : le pouce posé devient le centre d'un joystick invisible qui le suit ;
-  glisser ◀ ▶ = courir, glisser vers le haut = sauter, taper = tirer. Solo : moitié gauche = joystick, moitié droite = tir (tap) / saut (glisser vers le haut).
-  À 2 : une moitié d'écran par joueur, un 2e doigt dans sa moitié = tir. Seul un joystick fantôme s'affiche sous le pouce.
+- **Tactile, comme Carlito Fighter** : le pouce posé (hors boutons) devient le centre d'un joystick invisible qui le suit ;
+  glisser ◀ ▶ = courir, glisser vers le haut = sauter. Deux boutons visibles **SAUT** et **TIR** (`btnsOf`, `__hb.btns(p)`) :
+  en bas à droite en solo / en ligne ; à 2, une moitié d'écran par joueur, boutons vers le centre. Taper ailleurs ne tire plus.
 - **En ligne** : attente d'un adversaire (annulable), mise en relation, commandes de l'invité appliquées par l'hôte (tir compris, sans perte
   d'un tap rapide grâce aux compteurs `k`/`jc`), état affiché chez l'invité, départ d'un joueur = fin du match « Ton adversaire est parti ».
 
@@ -86,7 +87,7 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
   aura de feu autour de la tête chargée, balle orange avec traînée de flammes et « 🔥 SUPER TIR ! » au déclenchement
   (`setPower(i, 100)` puis un tir pour le voir).
 - **Chaussure** rouge (J1) / bleue (J2) qui monte pendant le tir. **Cages**, **HUD** (niveau d'IA sous le score), « BUUUT ! » + confettis.
-- **Mobile paysage** : `resize_window` 812×375, `setTouchMode(true)`. Pas de défilement horizontal, **aucun bouton**.
+- **Mobile paysage** : `resize_window` 812×375, `setTouchMode(true)`. Pas de défilement horizontal, boutons SAUT / TIR visibles et qui ne cachent pas les joueurs.
   Pendant le compte à rebours, l'aide (« Pouce gauche… / Pouce droit… », ou une par moitié à 2 avec la ligne pointillée)
   est dans les tribunes, sans cacher les joueurs. Un doigt posé montre un cercle fantôme et un point de la couleur du joueur.
   Remets ensuite le preset `desktop`.
