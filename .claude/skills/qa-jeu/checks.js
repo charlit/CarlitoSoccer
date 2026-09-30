@@ -205,6 +205,51 @@
     check('collision joueurs', d >= 2 * C.R - 1 && a.x < b.x, 'distance ' + d.toFixed(1) + ' (min ' + 2 * C.R + '), J1 reste à gauche ' + (a.x < b.x));
   });
 
+  // 16b. Jauge : chaque touche la remplit (tir +18, tête +12), plafonnée à 100, remise à zéro à chaque match
+  await safe('jauge', () => {
+    g.start(0, 4);
+    const a = P()[0];
+    const ft = g.footPos(a);
+    Object.assign(B(), { x: ft.x + 26, y: C.GROUND - C.BALL_R, vx: 0, vy: 0 });
+    g.press(0, 'kick'); g.run(14); g.release(0, 'kick');
+    const apresTir = a.power;
+    g.run(20);
+    Object.assign(B(), { x: a.x + 5, y: a.y - 150, vx: 0, vy: 0 }); g.run(30);
+    const apresTete = a.power;
+    let max = 0; // pleine, la tête suivante part en super coup et vide la jauge : on garde le maximum atteint
+    for (let n = 0; n < 12; n++) { Object.assign(B(), { x: a.x + 5, y: a.y - 150, vx: 0, vy: 0 }); for (let k = 0; k < 30; k++) { g.run(1); max = Math.max(max, a.power); } }
+    g.start(0, 4);
+    check('jauge', apresTir === 18 && apresTete === 30 && max === 100 && P()[0].power === 0 && P()[1].power === 0,
+      JSON.stringify({ apresTir, apresTete, plafond: max, nouveauMatch: P()[0].power }));
+  });
+
+  // 16c. Super tir : jauge pleine, le tir part en feu, traverse le gardien et marque ; la jauge se vide
+  await safe('super tir', () => {
+    g.start(0, 4); g.setPower(0, 100);
+    const [a, b] = P();
+    b.x = C.W - 130; // l'adversaire garde son but
+    const ft = g.footPos(a);
+    Object.assign(B(), { x: ft.x + 26, y: C.GROUND - C.BALL_R, vx: 0, vy: 0 });
+    g.press(0, 'kick'); let fire = 0, frames = 0;
+    for (; frames < 150 && g.info().state === 'play'; frames++) { g.run(1); fire = Math.max(fire, B().fire); }
+    g.release(0, 'kick');
+    const i = g.info();
+    check('super tir', fire > 0 && i.state === 'goal' && i.score.join() === '1,0' && a.power < 100,
+      JSON.stringify({ enFeu: fire > 0, images: frames, etat: i.state, score: i.score, jaugeApres: a.power }));
+  });
+
+  // 16d. Super tête (J2) : jauge pleine, une balle sur la tête part en feu vers le but de gauche
+  await safe('super tête', () => {
+    g.start(0, 4); g.setPower(1, 100);
+    const b = P()[1];
+    P()[0].x = 150;
+    Object.assign(B(), { x: b.x - 5, y: b.y - 150, vx: 0, vy: 0 });
+    let fire = 0, frames = 0;
+    for (; frames < 200 && g.info().state === 'play'; frames++) { g.run(1); fire = Math.max(fire, B().fire); }
+    const i = g.info();
+    check('super tête', fire > 0 && i.score.join() === '0,1', JSON.stringify({ enFeu: fire > 0, images: frames, score: i.score }));
+  });
+
   // 17. Robustesse : la balle reste dans le terrain, jamais NaN, même frappée n'importe comment
   await safe('robustesse', () => {
     g.start(0, 3);
@@ -298,7 +343,7 @@
     const start = got.find((m) => m.t === 'start'), host = g.info();
     g.run(4 * 60);
     await until(() => got.some((m) => m.t === 's' && m.st === 'play'));
-    const snapOk = got.some((m) => m.t === 's' && m.st === 'play');
+    const snapOk = got.some((m) => m.t === 's' && m.st === 'play' && Array.isArray(m.pw) && m.pw.length === 2 && 'bf' in m); // état + jauges + balle en feu
     const x0 = P()[1].x;
     guest.send(JSON.stringify({ t: 'in', x: -1, j: false, k: 1, jc: 0 }));
     await sleep(200); g.run(20);

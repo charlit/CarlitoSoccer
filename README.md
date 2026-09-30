@@ -28,6 +28,9 @@ les joueurs en ligne (WebSocket).
 | Tirer | S ou Espace | ↓ ou Entrée |
 
 En solo et en ligne, les deux jeux de touches marchent. Échap = retour au menu.
+**Super coup** : chaque touche de balle remplit ta jauge (sous le score). Quand elle est pleine, ton prochain tir
+ou ta prochaine tête part en feu, tout droit dans le but, en traversant les joueurs.
+
 Match de 60 secondes. Pour renommer un personnage : tableau `HEADS` en haut du script.
 
 ## Tester en local

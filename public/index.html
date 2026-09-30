@@ -36,6 +36,9 @@ const SPEED = 5.2, JUMP = -14.5, GRAV = 0.8;
 const BALL_R = 15, BALL_GRAV = 0.4, BALL_MAX = 21;
 const GOAL_W = 78, BAR_Y = GROUND - 175, BAR_H = 10;
 const KICK_LEN = 16, KICK_POWER = 17;
+// Jauge de super coup : chaque touche de balle la remplit ; pleine, le prochain tir ou la prochaine tête part en feu,
+// tout droit dans le but adverse, en traversant les joueurs.
+const POWER_KICK = 18, POWER_HEAD = 12, POWER_TOUCH = 5, FIRE_SPEED = 19;
 const MATCH_TIME = 60;           // secondes
 const STICK = 50, SWIPE_UP = 40; // joystick tactile invisible : course max du pouce, glissé vers le haut pour sauter
 const OUTLINE = '#1b1b2f';
@@ -260,6 +263,7 @@ const sfx = {
   final: () => { for (let i = 0; i < 3; i++) tone('sine', 2300, 2200, 0.28, 0.12, i * 0.38); },
   goal: () => { crowd(1.8, 0.9); sfx.whistle(); },
   tick: () => tone('square', 660, 660, 0.08, 0.08),
+  fire: () => { crowd(0.7, 0.7); tone('sawtooth', 140, 40, 0.6, 0.18); },
 };
 const events = [];
 // joue un son, et le transmet à l'invité quand on héberge une partie en ligne
@@ -271,20 +275,22 @@ let frame = 0, cd = 0, goalT = 0, endT = 0, shake = 0, lastScorer = -1, endNote 
 let timeLeft = MATCH_TIME;
 const score = [0, 0];
 const pick = [0, 4], ready = [false, false];
-const players = [0, 1].map((i) => ({ i, f: i === 0 ? 1 : -1, x: 0, y: REST_Y, vx: 0, vy: 0, onGround: true, kickT: 0, head: pick[i] }));
-const ball = { x: W / 2, y: 150, vx: 0, vy: 0, r: BALL_R, rot: 0 };
+const players = [0, 1].map((i) => ({ i, f: i === 0 ? 1 : -1, x: 0, y: REST_Y, vx: 0, vy: 0, onGround: true, kickT: 0, head: pick[i], power: 0, touchCd: 0 }));
+const ball = { x: W / 2, y: 150, vx: 0, vy: 0, r: BALL_R, rot: 0, fire: 0, fireBy: 0 };
+let superT = 0; // durée d'affichage de « SUPER TIR ! »
 const particles = [];
 const BARS = [[0, BAR_Y, GOAL_W + 4, BAR_Y + BAR_H], [W - GOAL_W - 4, BAR_Y, W, BAR_Y + BAR_H]];
 
 function kickoff() {
   players.forEach((p) => Object.assign(p, { x: p.i === 0 ? 220 : W - 220, y: REST_Y, vx: 0, vy: 0, onGround: true, kickT: 0 }));
   // la balle retombe au centre, légèrement vers celui qui vient d'encaisser
-  Object.assign(ball, { x: W / 2, y: 140, vx: lastScorer === 0 ? 1.2 : lastScorer === 1 ? -1.2 : 0, vy: 0 });
+  Object.assign(ball, { x: W / 2, y: 140, vx: lastScorer === 0 ? 1.2 : lastScorer === 1 ? -1.2 : 0, vy: 0, fire: 0 });
   ballHist.length = 0;
 }
 function startMatch() {
   score[0] = score[1] = 0; lastScorer = -1; timeLeft = MATCH_TIME; endNote = '';
-  players.forEach((p) => { p.head = pick[p.i]; });
+  players.forEach((p) => { p.head = pick[p.i]; p.power = 0; p.touchCd = 0; });
+  superT = 0;
   resetCtl(); touches.clear();
   kickoff(); state = 'countdown'; cd = 3 * 60 + 30; particles.length = 0;
 }
@@ -413,6 +419,7 @@ function snapshot() {
     t: 's', st: state, sc: score, tl: r1(timeLeft), cd, gt: goalT, ls: lastScorer, en: endNote,
     b: [r1(ball.x), r1(ball.y), r1(ball.rot)],
     p: players.map((p) => [r1(p.x), r1(p.y), r1(p.vx), r1(p.vy), p.kickT, p.onGround ? 1 : 0]),
+    pw: players.map((p) => Math.round(p.power)), bf: ball.fire > 0 ? 1 : 0, bb: ball.fireBy,
     ev: events.splice(0),
   };
 }
@@ -420,7 +427,9 @@ function applySnap(m) {
   const prev = state;
   state = m.st; score[0] = m.sc[0]; score[1] = m.sc[1]; timeLeft = m.tl; cd = m.cd; goalT = m.gt; lastScorer = m.ls; endNote = m.en;
   [ball.x, ball.y, ball.rot] = m.b;
-  m.p.forEach((a, i) => { const p = players[i]; [p.x, p.y, p.vx, p.vy, p.kickT] = a; p.onGround = !!a[5]; });
+  m.p.forEach((a, i) => { const p = players[i]; [p.x, p.y, p.vx, p.vy, p.kickT] = a; p.onGround = !!a[5]; p.power = m.pw ? m.pw[i] : 0; });
+  if (m.bf && !ball.fire) { superT = 60; ball.fireBy = m.bb; shake = 10; }
+  ball.fire = m.bf ? 1 : 0;
   m.ev.forEach((name) => sfx[name] && sfx[name]());
   if (state === 'goal' && prev !== 'goal') confetti(lastScorer);
   if (state === 'end' && prev !== 'end') { endT = 0; endConfetti(); }
@@ -441,6 +450,7 @@ function footPos(p) {
 // ================= physique =================
 function updatePlayer(p) {
   const c = ctl[p.i];
+  if (p.touchCd > 0) p.touchCd--;
   p.vx = c.x * SPEED;
   if ((c.jump || c.jumpQ > 0) && p.onGround) { p.vy = JUMP; p.onGround = false; c.jumpQ = 0; play('jump'); }
   if (c.kickQ > 0 && p.kickT === 0) { p.kickT = 1; c.kickQ = 0; }
@@ -501,7 +511,35 @@ function bounceRect(x0, y0, x1, y1) {
   if (ny < -0.5) ball.vx += x0 === 0 ? 0.25 : -0.25;
 }
 
+function gainPower(p, amount) {
+  if (p.touchCd > 0) return;
+  p.power = Math.min(100, p.power + amount); p.touchCd = 12;
+}
+function superShot(p) {
+  const tx = p.f === 1 ? W - 25 : 25, ty = GROUND - 70; // fond du but adverse, sous la barre
+  const dx = tx - ball.x, dy = ty - ball.y, d = Math.hypot(dx, dy) || 1;
+  ball.vx = dx / d * FIRE_SPEED; ball.vy = dy / d * FIRE_SPEED;
+  ball.fire = 120; ball.fireBy = p.i; p.power = 0; p.touchCd = 20;
+  if (p.kickT) p.kickT = 11;
+  superT = 60; shake = 10; play('fire');
+}
+function checkGoal() {
+  if (state !== 'play') return;
+  if (ball.x + ball.r < GOAL_W && ball.y > BAR_Y + BAR_H) goal(1);
+  else if (ball.x - ball.r > W - GOAL_W && ball.y > BAR_Y + BAR_H) goal(0);
+}
+
 function updateBall() {
+  // balle en feu : ligne droite, sans gravité, elle traverse les joueurs ; s'éteint sur un mur, le sol ou une barre
+  if (ball.fire > 0) {
+    ball.fire--;
+    ball.x += ball.vx; ball.y += ball.vy; ball.rot += ball.vx / ball.r;
+    const hit = ball.x < ball.r || ball.x > W - ball.r || ball.y > GROUND - ball.r || ball.y < ball.r
+      || BARS.some(([x0, y0, x1, y1]) => ball.x + ball.r > x0 && ball.x - ball.r < x1 && ball.y + ball.r > y0 && ball.y - ball.r < y1);
+    checkGoal();
+    if (!hit && ball.fire > 0) return;
+    ball.fire = 0; ball.vx *= 0.5; ball.vy *= 0.5;
+  }
   ball.vy += BALL_GRAV; ball.vx *= 0.997;
   ball.x += ball.vx; ball.y += ball.vy;
   ball.rot += ball.vx / ball.r;
@@ -517,12 +555,18 @@ function updateBall() {
   BARS.forEach((b) => bounceRect(...b));
 
   for (const p of players) {
+    if (ball.fire) break; // la balle en feu traverse tout le monde
     if (bounceCircle(p.x, p.y, R, p.vx, p.vy, 0.75)) {
+      if (p.power >= 100) { superShot(p); continue; }      // super tête
       if (Math.hypot(ball.vx, ball.vy) > 4) play('head');
+      gainPower(p, POWER_HEAD);
     }
     const ft = footPos(p);
     const kicking = p.kickT >= 1 && p.kickT <= 10;
-    if (bounceCircle(ft.x, ft.y, FOOT_R, p.vx, p.vy, 0.5) && kicking) {
+    const foot = bounceCircle(ft.x, ft.y, FOOT_R, p.vx, p.vy, 0.5);
+    if (foot && !kicking) gainPower(p, POWER_TOUCH);
+    if (foot && kicking && p.power >= 100) { superShot(p); continue; } // super tir
+    if (foot && kicking) {
       // tir : dans l'axe pied → balle, tiré vers l'avant et un peu vers le haut
       let dx = ball.x - ft.x, dy = ball.y - ft.y;
       const d = Math.hypot(dx, dy) || 1;
@@ -531,15 +575,12 @@ function updateBall() {
       ball.vx = dx / n * KICK_POWER + p.vx * 0.4; ball.vy = dy / n * KICK_POWER;
       p.kickT = 11; // la jambe redescend, un seul tir par coup de pied
       play('kick'); shake = Math.max(shake, 3);
+      p.touchCd = 0; gainPower(p, POWER_KICK);
     }
   }
   const sp = Math.hypot(ball.vx, ball.vy);
   if (sp > BALL_MAX) { ball.vx *= BALL_MAX / sp; ball.vy *= BALL_MAX / sp; }
-
-  if (state === 'play') {
-    if (ball.x + ball.r < GOAL_W && ball.y > BAR_Y + BAR_H) goal(1);
-    else if (ball.x - ball.r > W - GOAL_W && ball.y > BAR_Y + BAR_H) goal(0);
-  }
+  checkGoal();
 }
 
 const CONFETTI = ['#ffd93d', '#ff3b3b', '#2f7bff', '#3ddc84', '#ffffff', '#ff7ad9'];
@@ -600,10 +641,19 @@ function guestStep() {
   if ((s !== net.lastIn || frame % 30 === 0) && net.ws.readyState === 1) { net.ws.send(s); net.lastIn = s; }
   c.kickQ = c.jumpQ = 0;
 }
+const FIRE = ['#fff3b0', '#ffd93d', '#ff9f1c', '#ff5b1c', '#e0241b'];
+function flame(x, y, vx, vy, s) {
+  particles.push({ x, y, vx, vy, life: 16 + Math.random() * 12, c: FIRE[(Math.random() * FIRE.length) | 0], s, rot: 0, g: -0.06, fire: true });
+}
 function stepFx() {
+  if (superT > 0) superT--;
+  if (ball.fire && IN_MATCH.includes(state)) {
+    for (let k = 0; k < 4; k++) flame(ball.x + (Math.random() - 0.5) * 14, ball.y + (Math.random() - 0.5) * 14, -ball.vx * 0.15 + (Math.random() - 0.5) * 2, -ball.vy * 0.15 + (Math.random() - 0.5) * 2 - 0.5, 8 + Math.random() * 8);
+  }
+  if (IN_MATCH.includes(state)) for (const p of players) if (p.power >= 100 && frame % 3 === 0) flame(p.x + (Math.random() - 0.5) * 50, p.y - R + Math.random() * 20, 0, -1.5, 5 + Math.random() * 5);
   for (let i = particles.length - 1; i >= 0; i--) {
     const q = particles[i];
-    q.vy += 0.25; q.vx *= 0.99; q.x += q.vx; q.y += q.vy; q.rot += 0.2;
+    q.vy += q.g ?? 0.25; q.vx *= 0.99; q.x += q.vx; q.y += q.vy; q.rot += 0.2;
     if (--q.life <= 0 || q.y > H + 20) particles.splice(i, 1);
   }
   if (shake > 0) shake *= 0.88;
@@ -721,15 +771,26 @@ function tagOf(i) {
 }
 function drawPlayer(p) {
   const col = COLORS[p.i];
+  if (p.power >= 100) { // jauge pleine : aura de feu
+    const r = R * (1.35 + Math.sin(frame / 4) * 0.08);
+    const gr = ctx.createRadialGradient(p.x, p.y, R * 0.6, p.x, p.y, r);
+    gr.addColorStop(0, 'rgba(255,217,61,0.55)'); gr.addColorStop(1, 'rgba(255,91,28,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
+  }
   drawShoe(p, col);
   drawHead(HEADS[p.head], p.x, p.y - 2, p.f, 2 * R * 1.12, p.vx * 0.012 + (p.onGround ? 0 : p.f * p.vy * -0.006));
   ctx.font = font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   outlinedText(tagOf(p.i), p.x, p.y - R - 22, col.main, 4);
 }
 function drawBall() {
+  if (ball.fire) {
+    const gr = ctx.createRadialGradient(ball.x, ball.y, 4, ball.x, ball.y, 34);
+    gr.addColorStop(0, 'rgba(255,243,176,0.95)'); gr.addColorStop(0.5, 'rgba(255,159,28,0.6)'); gr.addColorStop(1, 'rgba(224,36,27,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(ball.x, ball.y, 34, 0, 7); ctx.fill();
+  }
   ctx.save();
   ctx.translate(ball.x, ball.y); ctx.rotate(ball.rot);
-  ctx.fillStyle = '#fff'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
+  ctx.fillStyle = ball.fire ? '#ffb347' : '#fff'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.arc(0, 0, ball.r, 0, 7); ctx.fill();
   ctx.save(); ctx.clip();
   ctx.fillStyle = OUTLINE;
@@ -762,7 +823,22 @@ function drawHud() {
   ctx.font = font(30);
   const t = Math.ceil(timeLeft);
   outlinedText(t + '', W / 2, 44, t <= 10 ? '#ff5b5b' : '#ffd93d');
-  if (mode === 'ai') { ctx.font = font(14); outlinedText('IA ' + AI_LEVELS[aiLevel].name, W / 2, 82, '#fff', 4); }
+  // jauges de super coup sous le tableau des scores (elles se remplissent vers le centre)
+  for (const i of [0, 1]) {
+    const pw = players[i].power, full = pw >= 100, x = i === 0 ? W / 2 - 168 : W / 2 + 8, y = 75, w = 160, h = 14;
+    ctx.fillStyle = 'rgba(27,27,47,0.85)'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 7); ctx.fill();
+    const fw = w * pw / 100;
+    if (fw > 0) {
+      const gr = ctx.createLinearGradient(x, 0, x + w, 0);
+      gr.addColorStop(i === 0 ? 0 : 1, '#ffd93d'); gr.addColorStop(i === 0 ? 1 : 0, '#ff3b1c');
+      ctx.globalAlpha = full ? 0.75 + Math.sin(frame / 3) * 0.25 : 1;
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.roundRect(i === 0 ? x : x + w - fw, y, fw, h, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = full ? '#ffd93d' : '#fff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.roundRect(x, y, w, h, 7); ctx.stroke();
+    if (full) { ctx.font = font(13); outlinedText('🔥 SUPER !', x + w / 2, y + h / 2 + 1, '#fff', 4); }
+  }
+  if (mode === 'ai') { ctx.font = font(14); outlinedText('IA ' + AI_LEVELS[aiLevel].name, W / 2, 104, '#fff', 4); }
 }
 // joystick fantôme : visible seulement sous le pouce, pendant qu'on le tient
 function drawTouches() {
@@ -876,6 +952,7 @@ function render() {
   }
   drawGoalFrame(true); drawGoalFrame(false);
   for (const q of particles) {
+    if (q.fire) { ctx.globalAlpha = Math.min(1, q.life / 16); ctx.fillStyle = q.c; ctx.beginPath(); ctx.arc(q.x, q.y, q.s * (0.4 + q.life / 40), 0, 7); ctx.fill(); ctx.globalAlpha = 1; continue; }
     ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillStyle = q.c; ctx.fillRect(-q.s / 2, -q.s / 4, q.s, q.s / 2); ctx.restore();
   }
   ctx.restore();
@@ -896,6 +973,12 @@ function render() {
     ctx.save(); ctx.translate(W / 2, H / 2 - 40); ctx.scale(k * (1 + Math.sin(frame / 5) * 0.04), k); ctx.rotate(-0.06);
     ctx.font = font(110); outlinedText('BUUUT !', 0, 0, COLORS[lastScorer].main, 14);
     ctx.font = font(30); outlinedText(HEADS[players[lastScorer].head].name, 0, 70, '#fff', 7);
+    ctx.restore();
+  }
+  if (superT > 0 && state === 'play') {
+    const k = Math.min(1, (60 - superT) / 8);
+    ctx.save(); ctx.translate(W / 2, 170); ctx.scale(k, k); ctx.rotate(-0.05);
+    ctx.font = font(64); outlinedText('🔥 SUPER TIR !', 0, 0, '#ff9f1c', 10);
     ctx.restore();
   }
   if (IN_MATCH.includes(state)) drawTouches();
@@ -949,7 +1032,7 @@ if (DEBUG) {
     info: () => ({ state, mode, aiLevel, aiSlots: [...aiSlots], me, score: [...score], timeLeft, pick: [...pick], ready: [...ready], touchMode, endNote, waitMsg,
       net: net ? { role: net.role, ready: net.ws.readyState } : null }),
     ball: () => ball, players: () => players, ctl: () => ctl, footPos, touches: () => [...touches.values()],
-    setTime(s) { timeLeft = s; }, setTouchMode(b) { touchMode = b; }, render,
+    setTime(s) { timeLeft = s; }, setPower(i, v) { players[i].power = v; }, setTouchMode(b) { touchMode = b; }, render,
   };
 }
 </script>

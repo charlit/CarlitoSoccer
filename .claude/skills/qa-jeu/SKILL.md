@@ -40,7 +40,7 @@ La QA teste le jeu **image par image** grâce au mode `?debug`. Le panneau navig
 
 ## 3. Suite de tests automatisés
 
-La suite est dans `checks.js`, à côté de ce fichier : 27 tests, dont 3 en ligne (la page se connecte au serveur,
+La suite est dans `checks.js`, à côté de ce fichier : 30 tests, dont 3 en ligne (la page se connecte au serveur,
 le test simule l'autre joueur avec son propre WebSocket). Le script est **asynchrone** :
 
 1. `cp .claude/skills/qa-jeu/checks.js public/__qa_checks_tmp.js` (fichier dans le `.gitignore`).
@@ -64,6 +64,10 @@ Règles de jeu que la suite protège :
 - En solo, ZQSD **et** les flèches contrôlent mon joueur. À 2, ZQSD = J1, flèches = J2.
 - Physique : saut au-dessus de la barre, un appui = un seul tir (≥ 12 px/image), tête qui renvoie la balle, but seulement sous la barre,
   un seul but par célébration, balle jamais coincée sur la barre, on peut se poser sur la barre, joueurs qui ne se traversent pas, jamais de `NaN`.
+- **Jauge de super coup** : tir +18, tête +12, simple contact +5 (une fois par 12 images), plafond 100, remise à 0 à chaque match.
+  Pleine : le prochain tir ou la prochaine tête part **en feu** (`superShot`) : ligne droite vers le fond du but adverse,
+  sans gravité, elle **traverse les joueurs** ; elle s'éteint sur un mur, le sol ou une barre. La jauge se vide.
+  L'IA l'utilise aussi. En ligne, l'état envoyé contient `pw` (jauges) et `bf` (balle en feu).
 - Fin du match (60 s) : appuis ignorés 1 s ; ensuite retour au choix des têtes (menu en ligne).
 - **IA** : difficile > moyen > facile en buts cumulés sur 12 matchs, et l'IA difficile bat un joueur immobile.
   Bug historique : l'IA qui court vers son but à travers la balle marque contre son camp → elle saute par-dessus.
@@ -78,6 +82,9 @@ Règles de jeu que la suite protège :
 Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
 - **Menu** : titre, 5 grandes pastilles de couleur. **Choix des têtes** : « ← MENU » en haut à gauche, cadres J1/J2 ou TOI.
 - **Têtes** détourées au ras des cheveux, contour noir qui suit la silhouette, retournées pour J2 ; étiquettes TOI / IA / ADV / J1 / J2.
+- **Jauges** sous le score (se remplissent vers le centre, clignotent avec « 🔥 SUPER ! » quand elles sont pleines),
+  aura de feu autour de la tête chargée, balle orange avec traînée de flammes et « 🔥 SUPER TIR ! » au déclenchement
+  (`setPower(i, 100)` puis un tir pour le voir).
 - **Chaussure** rouge (J1) / bleue (J2) qui monte pendant le tir. **Cages**, **HUD** (niveau d'IA sous le score), « BUUUT ! » + confettis.
 - **Mobile paysage** : `resize_window` 812×375, `setTouchMode(true)`. Pas de défilement horizontal, **aucun bouton**.
   Pendant le compte à rebours, l'aide (« Pouce gauche… / Pouce droit… », ou une par moitié à 2 avec la ligne pointillée)
@@ -98,7 +105,7 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
 
 ## 6. Rapport
 
-Termine par un résumé en français : résultat de la suite (X/27, détail des échecs), contrôles visuels faits
+Termine par un résumé en français : résultat de la suite (X/30, détail des échecs), contrôles visuels faits
 (capture si quelque chose a changé), bugs corrigés avec `fichier:ligne`, ce qui n'a pas pu être vérifié.
 
 Ne commite pas sans que l'utilisateur le demande.
