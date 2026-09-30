@@ -52,7 +52,7 @@ le test simule l'autre joueur avec son propre WebSocket). Le script est **asynch
    ```
 3. Supprime `public/__qa_checks_tmp.js` à la fin.
 
-Durée : ~20 s (le test « IA niveaux » joue 26 matchs en accéléré). Tous les tests doivent passer.
+Durée : ~20 s (le test « IA niveaux » joue 36 matchs en accéléré). Tous les tests doivent passer.
 Pour un échec, commence par savoir si c'est **le jeu** ou **le test** qui est en cause, corrige le bon côté, et ajoute
 un test pour chaque nouveau bug trouvé. Piège connu : pendant un `await sleep()`, la vraie boucle du jeu tourne aussi
 (si le panneau est visible), un état bref (coup de pied) peut donc être déjà fini — vérifie plutôt un compteur.
@@ -64,12 +64,12 @@ Règles de jeu que la suite protège :
 - En solo, ZQSD **et** les flèches contrôlent mon joueur. À 2, ZQSD = J1, flèches = J2.
 - Physique : saut au-dessus de la barre, un appui = un seul tir (≥ 12 px/image), tête qui renvoie la balle, but seulement sous la barre,
   un seul but par célébration, balle jamais coincée sur la barre, on peut se poser sur la barre, joueurs qui ne se traversent pas, jamais de `NaN`.
-- **Jauge de super coup** : tir +18, tête +12, simple contact +5 (une fois par 12 images), plafond 100, remise à 0 à chaque match.
+- **Jauge de super coup, seulement pour Maxou** (`fire: true` dans `HEADS`) : les autres têtes n'ont ni jauge ni super coup. Tir +18, tête +12, simple contact +5 (une fois par 12 images), plafond 100, remise à 0 à chaque match.
   Pleine : le prochain tir ou la prochaine tête part **en feu** (`superShot`) : ligne droite vers le fond du but adverse,
   sans gravité, elle **traverse les joueurs** ; elle s'éteint sur un mur, le sol ou une barre. La jauge se vide.
-  L'IA l'utilise aussi. En ligne, l'état envoyé contient `pw` (jauges) et `bf` (balle en feu).
+  En ligne, l'état envoyé contient `pw` (jauges) et `bf` (balle en feu).
 - Fin du match (60 s) : appuis ignorés 1 s ; ensuite retour au choix des têtes (menu en ligne).
-- **IA** : difficile > moyen > facile en buts cumulés sur 12 matchs, et l'IA difficile bat un joueur immobile.
+- **IA** : difficile > moyen > facile en buts cumulés sur 16 matchs, et l'IA difficile bat un joueur immobile.
   Bug historique : l'IA qui court vers son but à travers la balle marque contre son camp → elle saute par-dessus.
 - **Tactile sans aucun bouton** (façon Brawl Stars) : le pouce posé devient le centre d'un joystick invisible qui le suit ;
   glisser ◀ ▶ = courir, glisser vers le haut = sauter, taper = tirer. Solo : moitié gauche = joystick, moitié droite = tir (tap) / saut (glisser vers le haut).
@@ -82,7 +82,7 @@ Règles de jeu que la suite protège :
 Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
 - **Menu** : titre, 5 grandes pastilles de couleur. **Choix des têtes** : « ← MENU » en haut à gauche, cadres J1/J2 ou TOI.
 - **Têtes** détourées au ras des cheveux, contour noir qui suit la silhouette, retournées pour J2 ; étiquettes TOI / IA / ADV / J1 / J2.
-- **Jauges** sous le score (se remplissent vers le centre, clignotent avec « 🔥 SUPER ! » quand elles sont pleines),
+- **Jauge de Maxou** sous le score, de son côté (aucune jauge pour les autres têtes) (se remplissent vers le centre, clignotent avec « 🔥 SUPER ! » quand elles sont pleines),
   aura de feu autour de la tête chargée, balle orange avec traînée de flammes et « 🔥 SUPER TIR ! » au déclenchement
   (`setPower(i, 100)` puis un tir pour le voir).
 - **Chaussure** rouge (J1) / bleue (J2) qui monte pendant le tir. **Cages**, **HUD** (niveau d'IA sous le score), « BUUUT ! » + confettis.

@@ -205,9 +205,10 @@
     check('collision joueurs', d >= 2 * C.R - 1 && a.x < b.x, 'distance ' + d.toFixed(1) + ' (min ' + 2 * C.R + '), J1 reste à gauche ' + (a.x < b.x));
   });
 
-  // 16b. Jauge : chaque touche la remplit (tir +18, tête +12), plafonnée à 100, remise à zéro à chaque match
+  // 16b. Jauge (seulement Maxou) : chaque touche la remplit (tir +18, tête +12), plafonnée à 100, remise à zéro à chaque match
+  const MAXOU = g.heads.findIndex((h) => h.fire);
   await safe('jauge', () => {
-    g.start(0, 4);
+    g.start(MAXOU, 4);
     const a = P()[0];
     const ft = g.footPos(a);
     Object.assign(B(), { x: ft.x + 26, y: C.GROUND - C.BALL_R, vx: 0, vy: 0 });
@@ -218,14 +219,25 @@
     const apresTete = a.power;
     let max = 0; // pleine, la tête suivante part en super coup et vide la jauge : on garde le maximum atteint
     for (let n = 0; n < 12; n++) { Object.assign(B(), { x: a.x + 5, y: a.y - 150, vx: 0, vy: 0 }); for (let k = 0; k < 30; k++) { g.run(1); max = Math.max(max, a.power); } }
+    g.start(MAXOU, 4);
+    const nouveau = P()[0].power;
+    // les autres têtes n'ont pas de jauge : un tir ne la remplit pas, et même forcée à 100 il n'y a pas de super coup
     g.start(0, 4);
-    check('jauge', apresTir === 18 && apresTete === 30 && max === 100 && P()[0].power === 0 && P()[1].power === 0,
-      JSON.stringify({ apresTir, apresTete, plafond: max, nouveauMatch: P()[0].power }));
+    const o = P()[0], of = g.footPos(o);
+    Object.assign(B(), { x: of.x + 26, y: C.GROUND - C.BALL_R, vx: 0, vy: 0 });
+    g.press(0, 'kick'); g.run(14); g.release(0, 'kick');
+    const autreTir = o.power;
+    g.run(20); g.setPower(0, 100);
+    const of2 = g.footPos(o);
+    Object.assign(B(), { x: of2.x + 26, y: C.GROUND - C.BALL_R, vx: 0, vy: 0 });
+    g.press(0, 'kick'); let autreFeu = 0; for (let k = 0; k < 20; k++) { g.run(1); autreFeu = Math.max(autreFeu, B().fire); } g.release(0, 'kick');
+    check('jauge', g.heads[MAXOU].name === 'Maxou' && g.heads.filter((h) => h.fire).length === 1 && apresTir === 18 && apresTete === 30 && max === 100 && nouveau === 0 && autreTir === 0 && autreFeu === 0,
+      JSON.stringify({ maxou: { apresTir, apresTete, plafond: max, nouveauMatch: nouveau }, autreTete: { apresTir: autreTir, superCoup: autreFeu > 0 } }));
   });
 
-  // 16c. Super tir : jauge pleine, le tir part en feu, traverse le gardien et marque ; la jauge se vide
+  // 16c. Super tir de Maxou : jauge pleine, le tir part en feu, traverse le gardien et marque ; la jauge se vide
   await safe('super tir', () => {
-    g.start(0, 4); g.setPower(0, 100);
+    g.start(MAXOU, 4); g.setPower(0, 100);
     const [a, b] = P();
     b.x = C.W - 130; // l'adversaire garde son but
     const ft = g.footPos(a);
@@ -238,9 +250,9 @@
       JSON.stringify({ enFeu: fire > 0, images: frames, etat: i.state, score: i.score, jaugeApres: a.power }));
   });
 
-  // 16d. Super tête (J2) : jauge pleine, une balle sur la tête part en feu vers le but de gauche
+  // 16d. Super tête de Maxou en J2 : jauge pleine, une balle sur la tête part en feu vers le but de gauche
   await safe('super tête', () => {
-    g.start(0, 4); g.setPower(1, 100);
+    g.start(0, MAXOU); g.setPower(1, 100);
     const b = P()[1];
     P()[0].x = 150;
     Object.assign(B(), { x: b.x - 5, y: b.y - 150, vx: 0, vy: 0 });
@@ -280,11 +292,11 @@
 
   // 19. IA : les niveaux sont bien ordonnés (difficile > moyen > facile), et l'IA marque contre un joueur immobile
   await safe('IA niveaux', () => {
-    // buts cumulés sur 12 matchs, en changeant de côté à chaque match (les victoires seules sont trop aléatoires)
+    // buts cumulés sur 16 matchs, en changeant de côté à chaque match (les victoires seules sont trop aléatoires)
     const duel = (a, b, n) => { let ga = 0, gb = 0; for (let m = 0; m < n; m++) { const sw = m % 2; g.start(g.pickable[m % 4], g.boss, { mode: 'ai', ai: sw ? [b, a] : [a, b] }); g.run(62 * 60); const s = g.info().score; ga += sw ? s[1] : s[0]; gb += sw ? s[0] : s[1]; } return [ga, gb]; };
-    const d21 = duel(2, 1, 12), d10 = duel(1, 0, 12);
-    let hard = [0, 0]; for (let m = 0; m < 2; m++) { g.start(0, 3, { mode: 'ai', ai: [null, 2] }); g.run(62 * 60); const s = g.info().score; hard[0] += s[1]; hard[1] += s[0]; }
-    check('IA niveaux', d21[0] > d21[1] && d10[0] > d10[1] && hard[0] >= 3 && hard[0] > hard[1],
+    const d21 = duel(2, 1, 16), d10 = duel(1, 0, 16);
+    let hard = [0, 0]; for (let m = 0; m < 4; m++) { g.start(0, 3, { mode: 'ai', ai: [null, 2] }); g.run(62 * 60); const s = g.info().score; hard[0] += s[1]; hard[1] += s[0]; }
+    check('IA niveaux', d21[0] > d21[1] && d10[0] > d10[1] && hard[0] >= 4 && hard[0] > hard[1],
       JSON.stringify({ 'difficile-moyen (buts)': d21, 'moyen-facile': d10, 'difficile contre immobile (buts pour-contre)': hard }));
   });
 

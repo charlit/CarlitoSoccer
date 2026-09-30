@@ -36,8 +36,8 @@ const SPEED = 5.2, JUMP = -14.5, GRAV = 0.8;
 const BALL_R = 15, BALL_GRAV = 0.4, BALL_MAX = 21;
 const GOAL_W = 78, BAR_Y = GROUND - 175, BAR_H = 10;
 const KICK_LEN = 16, KICK_POWER = 17;
-// Jauge de super coup : chaque touche de balle la remplit ; pleine, le prochain tir ou la prochaine tête part en feu,
-// tout droit dans le but adverse, en traversant les joueurs.
+// Jauge de super coup, réservée aux têtes marquées fire: true (Maxou) : chaque touche de balle la remplit ; pleine,
+// le prochain tir ou la prochaine tête part en feu, tout droit dans le but adverse, en traversant les joueurs.
 const POWER_KICK = 18, POWER_HEAD = 12, POWER_TOUCH = 5, FIRE_SPEED = 19;
 const MATCH_TIME = 60;           // secondes
 const STICK = 50, SWIPE_UP = 40; // joystick tactile invisible : course max du pouce, glissé vers le haut pour sauter
@@ -52,7 +52,7 @@ const HEADS = [
   { src: 'heads/p3.png', name: 'Nono', flip: true },
   { src: 'heads/p4.png', name: 'Le Boss', boss: true }, // réservé à l'IA : on ne peut pas le choisir
   { src: 'heads/p5.png', name: 'Éclipse', flip: true },
-  { src: 'heads/p6.png', name: 'Rookie' },
+  { src: 'heads/p6.png', name: 'Maxou', fire: true }, // le seul à avoir la jauge et le ballon en feu
 ];
 // Chaque tête détourée reçoit un contour noir cartoon qui suit sa silhouette (calculé une fois au chargement).
 const SPRITE_H = 360, SPRITE_O = 13;
@@ -512,8 +512,9 @@ function bounceRect(x0, y0, x1, y1) {
   if (ny < -0.5) ball.vx += x0 === 0 ? 0.25 : -0.25;
 }
 
+const hasFire = (p) => !!HEADS[p.head].fire;
 function gainPower(p, amount) {
-  if (p.touchCd > 0) return;
+  if (p.touchCd > 0 || !hasFire(p)) return;
   p.power = Math.min(100, p.power + amount); p.touchCd = 12;
 }
 function superShot(p) {
@@ -558,7 +559,7 @@ function updateBall() {
   for (const p of players) {
     if (ball.fire) break; // la balle en feu traverse tout le monde
     if (bounceCircle(p.x, p.y, R, p.vx, p.vy, 0.75)) {
-      if (p.power >= 100) { superShot(p); continue; }      // super tête
+      if (p.power >= 100 && hasFire(p)) { superShot(p); continue; } // super tête
       if (Math.hypot(ball.vx, ball.vy) > 4) play('head');
       gainPower(p, POWER_HEAD);
     }
@@ -566,7 +567,7 @@ function updateBall() {
     const kicking = p.kickT >= 1 && p.kickT <= 10;
     const foot = bounceCircle(ft.x, ft.y, FOOT_R, p.vx, p.vy, 0.5);
     if (foot && !kicking) gainPower(p, POWER_TOUCH);
-    if (foot && kicking && p.power >= 100) { superShot(p); continue; } // super tir
+    if (foot && kicking && p.power >= 100 && hasFire(p)) { superShot(p); continue; } // super tir
     if (foot && kicking) {
       // tir : dans l'axe pied → balle, tiré vers l'avant et un peu vers le haut
       let dx = ball.x - ft.x, dy = ball.y - ft.y;
@@ -826,6 +827,7 @@ function drawHud() {
   outlinedText(t + '', W / 2, 44, t <= 10 ? '#ff5b5b' : '#ffd93d');
   // jauges de super coup sous le tableau des scores (elles se remplissent vers le centre)
   for (const i of [0, 1]) {
+    if (!hasFire(players[i])) continue; // seul Maxou a une jauge
     const pw = players[i].power, full = pw >= 100, x = i === 0 ? W / 2 - 168 : W / 2 + 8, y = 75, w = 160, h = 14;
     ctx.fillStyle = 'rgba(27,27,47,0.85)'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 7); ctx.fill();
     const fw = w * pw / 100;
