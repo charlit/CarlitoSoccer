@@ -131,6 +131,35 @@
     check('tir', out.every((o) => o.vitesse > 12 && o.sens), JSON.stringify(out));
   });
 
+  // 9b. Types de tir (sans bouton) : en courant = MISSILE (bas et fort), en reculant = LOB (haut, rétro), en l'air = VOLÉE ;
+  //     l'effet courbe la trajectoire (le lob monte plus haut qu'un tir normal, le missile reste bas)
+  await safe('types de tir', () => {
+    const shoot = (move, air) => {
+      g.start(0, 4); P()[1].x = C.W - 60; // l'adversaire loin, pour ne pas toucher la balle
+      const p = P()[0];
+      if (move) g.press(0, move);
+      if (air) { g.press(0, 'jump'); g.run(6); }
+      g.run(air ? 0 : 6);
+      const ft = g.footPos(p);
+      Object.assign(B(), { x: ft.x + (move === 'left' ? 10 : 24), y: air ? ft.y - 4 : C.GROUND - C.BALL_R, vx: 0, vy: 0 }); // en reculant, la balle est plus près du pied
+      g.press(0, 'kick'); g.run(2);
+      let kicked = false, v0 = null, top = B().y, spin = 0;
+      for (let k = 0; k < 70; k++) {
+        g.run(1);
+        if (!kicked && Math.hypot(B().vx, B().vy) > 9) { kicked = true; v0 = { vx: B().vx, vy: B().vy }; spin = B().spin; }
+        if (kicked) top = Math.min(top, B().y);
+        if (k === 10) g.releaseAll();
+      }
+      g.releaseAll();
+      return { label: g.pop().text, vx: v0 && +v0.vx.toFixed(1), vy: v0 && +v0.vy.toFixed(1), spin: +spin.toFixed(2), hautMax: Math.round(top) };
+    };
+    const normal = shoot(null, false), missile = shoot('right', false), lob = shoot('left', false), volee = shoot(null, true);
+    check('types de tir', missile.label === 'MISSILE !' && missile.vx > 14 && Math.abs(missile.vy) < 6
+      && lob.label === 'LOB !' && lob.vx > 0 && lob.spin < 0 && lob.hautMax < normal.hautMax - 40
+      && volee.label === 'VOLÉE !' && volee.vx > 14 && normal.vx > 10 && normal.spin > 0,
+      JSON.stringify({ normal, missile, lob, volee }));
+  });
+
   // 10. Un seul tir par appui : garder la touche enfoncée ne relance pas la jambe
   await safe('tir unique', () => {
     g.start(0, 3); park();

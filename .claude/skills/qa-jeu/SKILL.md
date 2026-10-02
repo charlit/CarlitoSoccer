@@ -40,7 +40,7 @@ La QA teste le jeu **image par image** grâce au mode `?debug`. Le panneau navig
 
 ## 3. Suite de tests automatisés
 
-La suite est dans `checks.js`, à côté de ce fichier : 31 tests, dont 3 en ligne (la page se connecte au serveur,
+La suite est dans `checks.js`, à côté de ce fichier : 32 tests, dont 3 en ligne (la page se connecte au serveur,
 le test simule l'autre joueur avec son propre WebSocket). Le script est **asynchrone** :
 
 1. `cp .claude/skills/qa-jeu/checks.js public/__qa_checks_tmp.js` (fichier dans le `.gitignore`).
@@ -68,6 +68,12 @@ Règles de jeu que la suite protège :
   Pleine : le prochain tir ou la prochaine tête part **en feu** (`superShot`) : ligne droite vers le fond du but adverse,
   sans gravité, elle **traverse les joueurs** ; elle s'éteint sur un mur, le sol ou une barre. La jauge se vide.
   En ligne, l'état envoyé contient `pw` (jauges) et `bf` (balle en feu).
+- **Physique du tir** (`SHOTS`, `shotType`) : le type dépend de ce que fait le joueur au moment du tir, sans bouton :
+  en courant vers le but avec la balle basse = **MISSILE** (tendu, fort), en reculant = **LOB** (haut, rétro qui fait flotter),
+  en l'air = **VOLÉE** (fort, plonge), sinon tir normal. Le bon timing (pied qui monte) donne la pleine puissance ;
+  ±5 % de puissance et un peu d'angle au hasard. **Effet** (`ball.spin`, effet Magnus `MAGNUS`) : la trajectoire se courbe,
+  et au rebond l'effet relance (brossé) ou freine (rétro) la balle. Tête en pleine extension = « TÊTE ! » plus puissante,
+  balle touchée de côté = un peu d'effet. Le nom du coup s'affiche au-dessus de la balle (`pop`, aussi envoyé en ligne).
 - Fin du match (60 s) : appuis ignorés 1 s ; ensuite retour au choix des têtes (menu en ligne).
 - **IA** : difficile > moyen > facile en buts cumulés sur 16 matchs, et l'IA difficile bat un joueur immobile.
   Bug historique : l'IA qui court vers son but à travers la balle marque contre son camp → elle saute par-dessus.
@@ -107,7 +113,7 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
 
 ## 6. Rapport
 
-Termine par un résumé en français : résultat de la suite (X/31, détail des échecs), contrôles visuels faits
+Termine par un résumé en français : résultat de la suite (X/32, détail des échecs), contrôles visuels faits
 (capture si quelque chose a changé), bugs corrigés avec `fichier:ligne`, ce qui n'a pas pu être vérifié.
 
 Ne commite pas sans que l'utilisateur le demande.

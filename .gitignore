@@ -1,3 +1,5 @@
 node_modules/
 package-lock.json
 public/__qa_checks_tmp.js
+deploy/watch-deploy.log
+deploy/.last_deployed

@@ -32,6 +32,10 @@ En solo et en ligne, les deux jeux de touches marchent. Échap = retour au menu.
 **Super coup de Maxou** : Maxou est le seul à avoir une jauge (sous le score). Chaque touche de balle la remplit ;
 quand elle est pleine, son prochain tir ou sa prochaine tête part en feu, tout droit dans le but, en traversant les joueurs.
 
+**Tirs** : le tir change selon ce que tu fais au moment de frapper — en courant vers le but : **missile** tendu ;
+en reculant : **lob** ; en l'air : **volée**. La balle prend de l'effet (sa trajectoire se courbe) et frapper au bon moment
+donne plus de puissance.
+
 Match de 60 secondes. Pour renommer un personnage : tableau `HEADS` en haut du script.
 
 ## Tester en local
@@ -46,6 +50,19 @@ PORT=8196 node server.js
 
 Puis `http://localhost:8196/` (ajoute `?debug` pour l'API de test `window.__hb`, voir `.claude/skills/qa-jeu`).
 Pour tester le mode en ligne, ouvre le jeu dans deux onglets et choisis « En ligne » dans les deux.
+
+## Déploiement automatique (à chaque push GitHub)
+
+Le script [`deploy/watch-deploy.sh`](deploy/watch-deploy.sh) regarde GitHub et, s'il y a un nouveau commit, reconstruit
+l'image et remplace le conteneur (si la construction échoue, l'ancienne version reste en ligne). À installer une fois
+sur le Mac mini :
+
+```bash
+chmod +x ~/CarlitoSoccer/deploy/watch-deploy.sh && (crontab -l 2>/dev/null; echo "*/5 * * * * /bin/bash $HOME/CarlitoSoccer/deploy/watch-deploy.sh") | crontab -
+```
+
+Ensuite chaque push sur `main` est en ligne dans les 5 minutes. Journal : `~/CarlitoSoccer/deploy/watch-deploy.log`.
+Ne fais plus de `git pull` à la main dans ce dossier, le script s'en charge.
 
 ## Déployer sur le Mac mini
 

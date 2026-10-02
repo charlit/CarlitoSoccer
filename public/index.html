@@ -36,6 +36,17 @@ const SPEED = 5.2, JUMP = -14.5, GRAV = 0.8;
 const BALL_R = 15, BALL_GRAV = 0.4, BALL_MAX = 21;
 const GOAL_W = 78, BAR_Y = GROUND - 175, BAR_H = 10;
 const KICK_LEN = 16, KICK_POWER = 17;
+// Effet (spin) : la balle tourne, sa trajectoire se courbe (effet Magnus) et son rebond change.
+// spin > 0 = sens horaire à l'écran (lift pour J1 = brossé vers le bas) ; MAGNUS règle la force de la courbe.
+const MAGNUS = 0.045, SPIN_DECAY = 0.985;
+// Types de tir, choisis selon ce que fait le joueur au moment du tir (aucun bouton en plus) :
+//   power : vitesse, lift : angle vers le haut (rad), spin : effet (positif = brossé, la balle plonge ; négatif = rétro, elle flotte)
+const SHOTS = {
+  normal: { power: 17, lift: 0.5, spin: 0.12, label: '' },
+  missile: { power: 19.5, lift: 0.14, spin: 0.22, label: 'MISSILE !' }, // en courant vers le but, balle basse
+  lob: { power: 15, lift: 1.05, spin: -0.3, label: 'LOB !' },          // en reculant
+  volee: { power: 20, lift: 0.05, spin: 0.3, label: 'VOLÉE !' },       // en l'air
+};
 // Jauge de super coup, réservée aux têtes marquées fire: true (Maxou) : chaque touche de balle la remplit ; pleine,
 // le prochain tir ou la prochaine tête part en feu, tout droit dans le but adverse, en traversant les joueurs.
 const POWER_KICK = 18, POWER_HEAD = 12, POWER_TOUCH = 5, FIRE_SPEED = 19;
@@ -277,7 +288,8 @@ let timeLeft = MATCH_TIME;
 const score = [0, 0];
 const pick = [0, 4], ready = [false, false];
 const players = [0, 1].map((i) => ({ i, f: i === 0 ? 1 : -1, x: 0, y: REST_Y, vx: 0, vy: 0, onGround: true, kickT: 0, head: pick[i], power: 0, touchCd: 0 }));
-const ball = { x: W / 2, y: 150, vx: 0, vy: 0, r: BALL_R, rot: 0, fire: 0, fireBy: 0 };
+const ball = { x: W / 2, y: 150, vx: 0, vy: 0, r: BALL_R, rot: 0, fire: 0, fireBy: 0, spin: 0 };
+const pop = { text: '', x: 0, y: 0, t: 0 }; // nom du coup affiché au-dessus de la balle
 let superT = 0; // durée d'affichage de « SUPER TIR ! »
 const particles = [];
 const BARS = [[0, BAR_Y, GOAL_W + 4, BAR_Y + BAR_H], [W - GOAL_W - 4, BAR_Y, W, BAR_Y + BAR_H]];
@@ -285,7 +297,8 @@ const BARS = [[0, BAR_Y, GOAL_W + 4, BAR_Y + BAR_H], [W - GOAL_W - 4, BAR_Y, W, 
 function kickoff() {
   players.forEach((p) => Object.assign(p, { x: p.i === 0 ? 220 : W - 220, y: REST_Y, vx: 0, vy: 0, onGround: true, kickT: 0 }));
   // la balle retombe au centre, légèrement vers celui qui vient d'encaisser
-  Object.assign(ball, { x: W / 2, y: 140, vx: lastScorer === 0 ? 1.2 : lastScorer === 1 ? -1.2 : 0, vy: 0, fire: 0 });
+  Object.assign(ball, { x: W / 2, y: 140, vx: lastScorer === 0 ? 1.2 : lastScorer === 1 ? -1.2 : 0, vy: 0, fire: 0, spin: 0 });
+  pop.t = 0;
   ballHist.length = 0;
 }
 function startMatch() {
@@ -427,6 +440,7 @@ function snapshot() {
     b: [r1(ball.x), r1(ball.y), r1(ball.rot)],
     p: players.map((p) => [r1(p.x), r1(p.y), r1(p.vx), r1(p.vy), p.kickT, p.onGround ? 1 : 0]),
     pw: players.map((p) => Math.round(p.power)), bf: ball.fire > 0 ? 1 : 0, bb: ball.fireBy,
+    pop: pop.t > 0 ? [pop.text, Math.round(pop.x), Math.round(pop.y), pop.t] : null,
     ev: events.splice(0),
   };
 }
@@ -437,6 +451,7 @@ function applySnap(m) {
   m.p.forEach((a, i) => { const p = players[i]; [p.x, p.y, p.vx, p.vy, p.kickT] = a; p.onGround = !!a[5]; p.power = m.pw ? m.pw[i] : 0; });
   if (m.bf && !ball.fire) { superT = 60; ball.fireBy = m.bb; shake = 10; }
   ball.fire = m.bf ? 1 : 0;
+  if (m.pop) [pop.text, pop.x, pop.y, pop.t] = m.pop; else pop.t = 0;
   m.ev.forEach((name) => sfx[name] && sfx[name]());
   if (state === 'goal' && prev !== 'goal') confetti(lastScorer);
   if (state === 'end' && prev !== 'end') { endT = 0; endConfetti(); }
@@ -513,7 +528,11 @@ function bounceRect(x0, y0, x1, y1) {
   const nx = d ? dx / d : 0, ny = d ? dy / d : -1;
   ball.x = cx + nx * ball.r; ball.y = cy + ny * ball.r;
   const vn = ball.vx * nx + ball.vy * ny;
-  if (vn < 0) { ball.vx -= 1.6 * vn * nx; ball.vy -= 1.6 * vn * ny; if (vn < -2) play('bounce'); }
+  if (vn < 0) {
+    ball.vx -= 1.6 * vn * nx; ball.vy -= 1.6 * vn * ny; ball.spin *= 0.7;
+    if (vn < -2) play('bounce');
+    if (vn < -7) showPop('BARRE !');
+  }
   // posée sur la barre : elle roule vers le terrain au lieu de rester coincée
   if (ny < -0.5) ball.vx += x0 === 0 ? 0.25 : -0.25;
 }
@@ -548,18 +567,23 @@ function updateBall() {
     if (!hit && ball.fire > 0) return;
     ball.fire = 0; ball.vx *= 0.5; ball.vy *= 0.5;
   }
-  ball.vy += BALL_GRAV; ball.vx *= 0.997;
+  const onGround = ball.y >= GROUND - ball.r - 0.5;
+  // effet Magnus : la vitesse est déviée à 90° proportionnellement à l'effet (brossé = plonge, rétro = flotte)
+  if (!onGround) { ball.vx += -MAGNUS * ball.spin * ball.vy; ball.vy += MAGNUS * ball.spin * ball.vx; }
+  ball.vy += BALL_GRAV; ball.vx *= 0.997; ball.spin *= SPIN_DECAY;
   ball.x += ball.vx; ball.y += ball.vy;
-  ball.rot += ball.vx / ball.r;
+  ball.rot += onGround ? ball.vx / ball.r : ball.spin;
   if (ball.y > GROUND - ball.r) {
     ball.y = GROUND - ball.r;
     if (ball.vy > 2) play('bounce');
-    ball.vy = Math.abs(ball.vy) < 1.2 ? 0 : -ball.vy * 0.72;
+    // au rebond, l'effet « mord » le sol : brossé → la balle repart vers l'avant, rétro → elle freine / revient
+    ball.vx += ball.spin * ball.r * 0.25; ball.spin *= 0.5;
+    ball.vy = Math.abs(ball.vy) < 1.2 ? 0 : -ball.vy * (0.66 + Math.random() * 0.1);
     ball.vx *= 0.985;
   }
   if (ball.y < ball.r) { ball.y = ball.r; ball.vy = Math.abs(ball.vy) * 0.7; }
-  if (ball.x < ball.r) { ball.x = ball.r; ball.vx = Math.abs(ball.vx) * 0.7; }
-  if (ball.x > W - ball.r) { ball.x = W - ball.r; ball.vx = -Math.abs(ball.vx) * 0.7; }
+  if (ball.x < ball.r) { ball.x = ball.r; ball.vx = Math.abs(ball.vx) * 0.7; ball.spin *= -0.5; }
+  if (ball.x > W - ball.r) { ball.x = W - ball.r; ball.vx = -Math.abs(ball.vx) * 0.7; ball.spin *= -0.5; }
   BARS.forEach((b) => bounceRect(...b));
 
   for (const p of players) {
@@ -567,6 +591,8 @@ function updateBall() {
     if (bounceCircle(p.x, p.y, R, p.vx, p.vy, 0.75)) {
       if (p.power >= 100 && hasFire(p)) { superShot(p); continue; } // super tête
       if (Math.hypot(ball.vx, ball.vy) > 4) play('head');
+      ball.spin = clamp(ball.spin * 0.3 + (ball.x - p.x) / R * 0.12 * Math.sign(ball.vy || 1), -0.3, 0.3); // touche de côté = effet
+      if (p.vy < -6 && ball.y < p.y - R * 0.5) { ball.vx += p.f * 3; showPop('TÊTE !'); } // tête en pleine extension : plus de punch vers l'avant
       gainPower(p, POWER_HEAD);
     }
     const ft = footPos(p);
@@ -575,12 +601,16 @@ function updateBall() {
     if (foot && !kicking) gainPower(p, POWER_TOUCH);
     if (foot && kicking && p.power >= 100 && hasFire(p)) { superShot(p); continue; } // super tir
     if (foot && kicking) {
-      // tir : dans l'axe pied → balle, tiré vers l'avant et un peu vers le haut
-      let dx = ball.x - ft.x, dy = ball.y - ft.y;
-      const d = Math.hypot(dx, dy) || 1;
-      dx = dx / d + p.f * 1.2; dy = dy / d - 0.55;
-      const n = Math.hypot(dx, dy);
-      ball.vx = dx / n * KICK_POWER + p.vx * 0.4; ball.vy = dy / n * KICK_POWER;
+      const shot = SHOTS[shotType(p)];
+      // bon timing (pied qui monte, images 1 à 5) = pleine puissance ; balle frappée en fin de geste = tir plus mou
+      const timing = p.kickT <= 5 ? 1 : p.kickT <= 7 ? 0.88 : 0.72;
+      const power = shot.power * timing * (0.95 + Math.random() * 0.1);
+      // angle : vers l'avant et vers le haut selon le type, corrigé par l'endroit où le pied touche la balle, + un peu de hasard
+      const hit = clamp((ft.y - ball.y) / (FOOT_R + ball.r), -1, 1) * 0.25; // pied sous la balle = plus haut
+      const a = shot.lift + hit + (Math.random() - 0.5) * 0.12;
+      ball.vx = p.f * Math.cos(a) * power + (p.vx * p.f > 0 ? p.vx * 0.4 : 0); ball.vy = -Math.sin(a) * power; // l'élan ne compte qu'en avançant
+      ball.spin = p.f * shot.spin;
+      if (shot.label) showPop(shot.label);
       p.kickT = 11; // la jambe redescend, un seul tir par coup de pied
       play('kick'); shake = Math.max(shake, 3);
       p.touchCd = 0; gainPower(p, POWER_KICK);
@@ -590,6 +620,15 @@ function updateBall() {
   if (sp > BALL_MAX) { ball.vx *= BALL_MAX / sp; ball.vy *= BALL_MAX / sp; }
   checkGoal();
 }
+
+function shotType(p) {
+  const run = ctl[p.i].x * p.f; // > 0 : court vers le but adverse, < 0 : recule
+  if (!p.onGround) return 'volee';
+  if (run < -0.3) return 'lob';
+  if (run > 0.3 && ball.y > GROUND - 60) return 'missile';
+  return 'normal';
+}
+function showPop(text) { Object.assign(pop, { text, x: ball.x, y: ball.y - 30, t: 45 }); }
 
 const CONFETTI = ['#ffd93d', '#ff3b3b', '#2f7bff', '#3ddc84', '#ffffff', '#ff7ad9'];
 function confetti(scorer) {
@@ -655,6 +694,7 @@ function flame(x, y, vx, vy, s) {
 }
 function stepFx() {
   if (superT > 0) superT--;
+  if (pop.t > 0) { pop.t--; pop.y -= 0.6; }
   if (ball.fire && IN_MATCH.includes(state)) {
     for (let k = 0; k < 4; k++) flame(ball.x + (Math.random() - 0.5) * 14, ball.y + (Math.random() - 0.5) * 14, -ball.vx * 0.15 + (Math.random() - 0.5) * 2, -ball.vy * 0.15 + (Math.random() - 0.5) * 2 - 0.5, 8 + Math.random() * 8);
   }
@@ -993,6 +1033,10 @@ function render() {
     ctx.font = font(30); outlinedText(HEADS[players[lastScorer].head].name, 0, 70, '#fff', 7);
     ctx.restore();
   }
+  if (pop.t > 0 && IN_MATCH.includes(state)) {
+    ctx.globalAlpha = Math.min(1, pop.t / 12); ctx.font = font(26);
+    outlinedText(pop.text, clamp(pop.x, 90, W - 90), clamp(pop.y, 130, H - 40), '#ffd93d', 6); ctx.globalAlpha = 1;
+  }
   if (superT > 0 && state === 'play') {
     const k = Math.min(1, (60 - superT) / 8);
     ctx.save(); ctx.translate(W / 2, 170); ctx.scale(k, k); ctx.rotate(-0.05);
@@ -1050,7 +1094,7 @@ if (DEBUG) {
     info: () => ({ state, mode, aiLevel, aiSlots: [...aiSlots], me, score: [...score], timeLeft, pick: [...pick], ready: [...ready], touchMode, endNote, waitMsg,
       net: net ? { role: net.role, ready: net.ws.readyState } : null }),
     ball: () => ball, players: () => players, ctl: () => ctl, footPos, touches: () => [...touches.values()],
-    pollLobby, lobby: () => lobby,
+    pollLobby, lobby: () => lobby, pop: () => pop, shots: SHOTS,
     setTime(s) { timeLeft = s; }, setPower(i, v) { players[i].power = v; }, setTouchMode(b) { touchMode = b; }, render,
   };
 }
