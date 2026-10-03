@@ -36,6 +36,9 @@ quand elle est pleine, son prochain tir ou sa prochaine tête part en feu, tout 
 en reculant : **lob** ; en l'air : **volée**. La balle prend de l'effet (sa trajectoire se courbe) et frapper au bon moment
 donne plus de puissance.
 
+**Poteaux et vent** : le haut des poteaux renvoie la balle (« POTEAU ! »). À chaque match, un vent différent
+(affiché en haut à gauche) pousse la balle quand elle est en l'air.
+
 Match de 60 secondes. Pour renommer un personnage : tableau `HEADS` en haut du script.
 
 ## Tester en local

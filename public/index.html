@@ -39,6 +39,13 @@ const KICK_LEN = 16, KICK_POWER = 17;
 // Effet (spin) : la balle tourne, sa trajectoire se courbe (effet Magnus) et son rebond change.
 // spin > 0 = sens horaire à l'écran (lift pour J1 = brossé vers le bas) ; MAGNUS règle la force de la courbe.
 const MAGNUS = 0.045, SPIN_DECAY = 0.985;
+// Poteaux : vu de côté, le poteau vertical est la ligne de but ; seul le haut du poteau (le coin du cadre, POST_LEN px sous
+// la barre) est solide et renvoie la balle très fort. Plus bas, la balle passe et c'est but.
+const POST_R = 7, POST_LEN = 30, POST_BOUNCE = 0.92;
+const POSTS = [GOAL_W, W - GOAL_W]; // x des poteaux
+// Vent : tiré au hasard à chaque match (calme, léger, moyen, fort, vers la gauche ou la droite), avec des rafales.
+// Il pousse la balle seulement quand elle est en l'air (px/image²).
+const WINDS = [0, 0.02, 0.035, 0.05];
 // Types de tir, choisis selon ce que fait le joueur au moment du tir (aucun bouton en plus) :
 //   power : vitesse, lift : angle vers le haut (rad), spin : effet (positif = brossé, la balle plonge ; négatif = rétro, elle flotte)
 const SHOTS = {
@@ -101,7 +108,7 @@ let mode = 'local', aiLevel = 1;
 let me = 0;                       // joueur contrôlé par cet appareil en solo / en ligne (1 = invité en ligne)
 const aiSlots = [null, null];     // niveau d'IA de chaque joueur (null = humain)
 const AI_LEVELS = [
-  { name: 'Facile', delay: 35, kick: 0.08, jump: 0.1, dead: 40, err: 70, lazy: 0.6 },
+  { name: 'Facile', delay: 40, kick: 0.05, jump: 0.08, dead: 45, err: 80, lazy: 0.7 },
   { name: 'Moyen', delay: 6, kick: 0.6, jump: 0.85, dead: 10, err: 14, lazy: 0.15 },
   { name: 'Difficile', delay: 3, kick: 0.9, jump: 1, dead: 6, err: 6, lazy: 0 },
 ];
@@ -270,6 +277,7 @@ const sfx = {
   kick: () => tone('square', 190, 55, 0.12, 0.25),
   head: () => tone('triangle', 260, 120, 0.1, 0.2),
   bounce: () => tone('sine', 140, 80, 0.06, 0.12),
+  post: () => { tone('triangle', 1500, 1300, 0.35, 0.16); tone('sine', 2250, 2150, 0.3, 0.08); }, // « ting » métallique
   jump: () => tone('sine', 320, 640, 0.1, 0.06),
   whistle: () => tone('sine', 2300, 2200, 0.28, 0.12),
   final: () => { for (let i = 0; i < 3; i++) tone('sine', 2300, 2200, 0.28, 0.12, i * 0.38); },
@@ -290,7 +298,8 @@ const pick = [0, 4], ready = [false, false];
 const players = [0, 1].map((i) => ({ i, f: i === 0 ? 1 : -1, x: 0, y: REST_Y, vx: 0, vy: 0, onGround: true, kickT: 0, head: pick[i], power: 0, touchCd: 0 }));
 const ball = { x: W / 2, y: 150, vx: 0, vy: 0, r: BALL_R, rot: 0, fire: 0, fireBy: 0, spin: 0 };
 const pop = { text: '', x: 0, y: 0, t: 0 }; // nom du coup affiché au-dessus de la balle
-let superT = 0; // durée d'affichage de « SUPER TIR ! »
+let superT = 0;
+let wind = 0; // durée d'affichage de « SUPER TIR ! »
 const particles = [];
 const BARS = [[0, BAR_Y, GOAL_W + 4, BAR_Y + BAR_H], [W - GOAL_W - 4, BAR_Y, W, BAR_Y + BAR_H]];
 
@@ -305,6 +314,8 @@ function startMatch() {
   score[0] = score[1] = 0; lastScorer = -1; timeLeft = MATCH_TIME; endNote = '';
   players.forEach((p) => { p.head = pick[p.i]; p.power = 0; p.touchCd = 0; });
   superT = 0;
+  const lvl = Math.random() < 0.25 ? 0 : 1 + ((Math.random() * 3) | 0);
+  wind = WINDS[lvl] * (Math.random() < 0.5 ? -1 : 1);
   resetCtl(); touches.clear();
   kickoff(); state = 'countdown'; cd = 3 * 60 + 30; particles.length = 0;
 }
@@ -439,7 +450,7 @@ function snapshot() {
     t: 's', st: state, sc: score, tl: r1(timeLeft), cd, gt: goalT, ls: lastScorer, en: endNote,
     b: [r1(ball.x), r1(ball.y), r1(ball.rot)],
     p: players.map((p) => [r1(p.x), r1(p.y), r1(p.vx), r1(p.vy), p.kickT, p.onGround ? 1 : 0]),
-    pw: players.map((p) => Math.round(p.power)), bf: ball.fire > 0 ? 1 : 0, bb: ball.fireBy,
+    pw: players.map((p) => Math.round(p.power)), bf: ball.fire > 0 ? 1 : 0, bb: ball.fireBy, wd: wind,
     pop: pop.t > 0 ? [pop.text, Math.round(pop.x), Math.round(pop.y), pop.t] : null,
     ev: events.splice(0),
   };
@@ -451,6 +462,7 @@ function applySnap(m) {
   m.p.forEach((a, i) => { const p = players[i]; [p.x, p.y, p.vx, p.vy, p.kickT] = a; p.onGround = !!a[5]; p.power = m.pw ? m.pw[i] : 0; });
   if (m.bf && !ball.fire) { superT = 60; ball.fireBy = m.bb; shake = 10; }
   ball.fire = m.bf ? 1 : 0;
+  wind = m.wd || 0;
   if (m.pop) [pop.text, pop.x, pop.y, pop.t] = m.pop; else pop.t = 0;
   m.ev.forEach((name) => sfx[name] && sfx[name]());
   if (state === 'goal' && prev !== 'goal') confetti(lastScorer);
@@ -522,6 +534,19 @@ function bounceCircle(cx, cy, cr, cvx, cvy, rest) {
   if (vn < 0) { ball.vx -= (1 + rest) * vn * nx; ball.vy -= (1 + rest) * vn * ny; }
   return true;
 }
+function bouncePost(px) {
+  // segment vertical du haut du poteau (de la barre jusqu'à POST_LEN px dessous), arrondi : la balle rebondit dessus
+  const cy = clamp(ball.y, BAR_Y + BAR_H / 2, BAR_Y + BAR_H + POST_LEN);
+  const dx = ball.x - px, dy = ball.y - cy, d = Math.hypot(dx, dy), min = POST_R + ball.r;
+  if (d >= min) return;
+  const nx = d ? dx / d : (px < W / 2 ? 1 : -1), ny = d ? dy / d : 0;
+  ball.x = px + nx * min; ball.y = cy + ny * min;
+  const vn = ball.vx * nx + ball.vy * ny;
+  if (vn < 0) {
+    ball.vx -= (1 + POST_BOUNCE) * vn * nx; ball.vy -= (1 + POST_BOUNCE) * vn * ny; ball.spin *= -0.6;
+    if (vn < -3) { play('post'); showPop('POTEAU !'); shake = Math.max(shake, 5); }
+  }
+}
 function bounceRect(x0, y0, x1, y1) {
   const cx = clamp(ball.x, x0, x1), cy = clamp(ball.y, y0, y1), dx = ball.x - cx, dy = ball.y - cy, d = Math.hypot(dx, dy);
   if (d >= ball.r) return;
@@ -563,6 +588,7 @@ function updateBall() {
     ball.x += ball.vx; ball.y += ball.vy; ball.rot += ball.vx / ball.r;
     const hit = ball.x < ball.r || ball.x > W - ball.r || ball.y > GROUND - ball.r || ball.y < ball.r
       || BARS.some(([x0, y0, x1, y1]) => ball.x + ball.r > x0 && ball.x - ball.r < x1 && ball.y + ball.r > y0 && ball.y - ball.r < y1);
+    // (la balle en feu vise le bas du but : elle ne touche jamais le haut du poteau)
     checkGoal();
     if (!hit && ball.fire > 0) return;
     ball.fire = 0; ball.vx *= 0.5; ball.vy *= 0.5;
@@ -570,6 +596,7 @@ function updateBall() {
   const onGround = ball.y >= GROUND - ball.r - 0.5;
   // effet Magnus : la vitesse est déviée à 90° proportionnellement à l'effet (brossé = plonge, rétro = flotte)
   if (!onGround) { ball.vx += -MAGNUS * ball.spin * ball.vy; ball.vy += MAGNUS * ball.spin * ball.vx; }
+  if (!onGround) ball.vx += wind * (1 + 0.4 * Math.sin(frame / 45)); // vent, avec des rafales
   ball.vy += BALL_GRAV; ball.vx *= 0.997; ball.spin *= SPIN_DECAY;
   ball.x += ball.vx; ball.y += ball.vy;
   ball.rot += onGround ? ball.vx / ball.r : ball.spin;
@@ -584,6 +611,7 @@ function updateBall() {
   if (ball.y < ball.r) { ball.y = ball.r; ball.vy = Math.abs(ball.vy) * 0.7; }
   if (ball.x < ball.r) { ball.x = ball.r; ball.vx = Math.abs(ball.vx) * 0.7; ball.spin *= -0.5; }
   if (ball.x > W - ball.r) { ball.x = W - ball.r; ball.vx = -Math.abs(ball.vx) * 0.7; ball.spin *= -0.5; }
+  POSTS.forEach(bouncePost);
   BARS.forEach((b) => bounceRect(...b));
 
   for (const p of players) {
@@ -695,6 +723,10 @@ function flame(x, y, vx, vy, s) {
 function stepFx() {
   if (superT > 0) superT--;
   if (pop.t > 0) { pop.t--; pop.y -= 0.6; }
+  if (wind && IN_MATCH.includes(state) && frame % Math.round(10 - Math.abs(wind) * 120) === 0) {
+    const sx = Math.sign(wind);
+    particles.push({ x: sx > 0 ? -40 : W + 40, y: 120 + Math.random() * 300, vx: sx * (5 + Math.abs(wind) * 160), vy: 0, g: 0, life: 260, wind: true, s: 20 + Math.random() * 30, c: '#fff', rot: 0 });
+  }
   if (ball.fire && IN_MATCH.includes(state)) {
     for (let k = 0; k < 4; k++) flame(ball.x + (Math.random() - 0.5) * 14, ball.y + (Math.random() - 0.5) * 14, -ball.vx * 0.15 + (Math.random() - 0.5) * 2, -ball.vy * 0.15 + (Math.random() - 0.5) * 2 - 0.5, 8 + Math.random() * 8);
   }
@@ -781,6 +813,11 @@ function drawGoalFrame(left) {
   ctx.beginPath(); ctx.roundRect(x0 - 4, y0, x1 - x0 + 8, BAR_H, 4); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#ff3b3b';
   for (let x = x0 + 8; x < x1 - 8; x += 22) ctx.fillRect(x, y0 + 2, 9, BAR_H - 4);
+  // haut du poteau (la partie solide) : renfort métallique
+  const px = left ? POSTS[0] : POSTS[1];
+  ctx.fillStyle = '#d9e2ec'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(px - POST_R, y0 - 2, POST_R * 2, BAR_H + POST_LEN + 2, POST_R); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.fillRect(px - 2, y0 + 3, 3, BAR_H + POST_LEN - 8);
 }
 
 function drawShoe(p, col) {
@@ -888,6 +925,14 @@ function drawHud() {
     if (full) { ctx.font = font(13); outlinedText('🔥 SUPER !', x + w / 2, y + h / 2 + 1, '#fff', 4); }
   }
   if (mode === 'ai') { ctx.font = font(14); outlinedText('IA ' + AI_LEVELS[aiLevel].name, W / 2, 104, '#fff', 4); }
+  // vent, en haut à gauche : force (0 à 3 flèches) et sens
+  const lvl = WINDS.indexOf(Math.abs(wind));
+  ctx.fillStyle = 'rgba(27,27,47,0.85)'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(12, 10, 168, 38, 12); ctx.fill(); ctx.stroke();
+  ctx.font = font(18); ctx.textAlign = 'left';
+  if (lvl <= 0) outlinedText('💨 PAS DE VENT', 24, 30, '#fff', 4);
+  else outlinedText('💨 VENT ' + (wind > 0 ? '▶'.repeat(lvl) : '◀'.repeat(lvl)), 24, 30, ['', '#bdeeff', '#ffd93d', '#ff7a45'][lvl], 4);
+  ctx.textAlign = 'center';
 }
 // joystick fantôme : visible seulement sous le pouce, pendant qu'on le tient
 function drawTouches() {
@@ -1010,6 +1055,7 @@ function render() {
   }
   drawGoalFrame(true); drawGoalFrame(false);
   for (const q of particles) {
+    if (q.wind) { ctx.globalAlpha = 0.35; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - Math.sign(q.vx) * q.s, q.y); ctx.stroke(); ctx.globalAlpha = 1; continue; }
     if (q.fire) { ctx.globalAlpha = Math.min(1, q.life / 16); ctx.fillStyle = q.c; ctx.beginPath(); ctx.arc(q.x, q.y, q.s * (0.4 + q.life / 40), 0, 7); ctx.fill(); ctx.globalAlpha = 1; continue; }
     ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillStyle = q.c; ctx.fillRect(-q.s / 2, -q.s / 4, q.s, q.s / 2); ctx.restore();
   }
@@ -1085,7 +1131,7 @@ if (DEBUG) {
       toMenu(); mode = o.mode || 'local'; pick[0] = a; pick[1] = b;
       aiSlots[0] = o.ai ? o.ai[0] : null; aiSlots[1] = o.ai ? o.ai[1] : null;
       if (aiSlots[1] !== null) aiLevel = aiSlots[1];
-      startMatch(); cd = 1; step();
+      startMatch(); wind = o.wind || 0; cd = 1; step(); // vent nul par défaut : tests reproductibles
     },
     toMenu, toSelect, chooseMenu, key: uiKey, tap: (x, y) => uiTap({ x, y }),
     run(n = 1) { for (let i = 0; i < n; i++) step(); },
@@ -1094,7 +1140,7 @@ if (DEBUG) {
     info: () => ({ state, mode, aiLevel, aiSlots: [...aiSlots], me, score: [...score], timeLeft, pick: [...pick], ready: [...ready], touchMode, endNote, waitMsg,
       net: net ? { role: net.role, ready: net.ws.readyState } : null }),
     ball: () => ball, players: () => players, ctl: () => ctl, footPos, touches: () => [...touches.values()],
-    pollLobby, lobby: () => lobby, pop: () => pop, shots: SHOTS,
+    pollLobby, lobby: () => lobby, pop: () => pop, shots: SHOTS, winds: WINDS, wind: () => wind, setWind(v) { wind = v; },
     setTime(s) { timeLeft = s; }, setPower(i, v) { players[i].power = v; }, setTouchMode(b) { touchMode = b; }, render,
   };
 }

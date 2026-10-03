@@ -40,7 +40,7 @@ La QA teste le jeu **image par image** grâce au mode `?debug`. Le panneau navig
 
 ## 3. Suite de tests automatisés
 
-La suite est dans `checks.js`, à côté de ce fichier : 32 tests, dont 3 en ligne (la page se connecte au serveur,
+La suite est dans `checks.js`, à côté de ce fichier : 34 tests, dont 3 en ligne (la page se connecte au serveur,
 le test simule l'autre joueur avec son propre WebSocket). Le script est **asynchrone** :
 
 1. `cp .claude/skills/qa-jeu/checks.js public/__qa_checks_tmp.js` (fichier dans le `.gitignore`).
@@ -52,7 +52,7 @@ le test simule l'autre joueur avec son propre WebSocket). Le script est **asynch
    ```
 3. Supprime `public/__qa_checks_tmp.js` à la fin.
 
-Durée : ~20 s (le test « IA niveaux » joue 36 matchs en accéléré). Tous les tests doivent passer.
+Durée : ~20 s (le test « IA niveaux » joue 44 matchs en accéléré). Tous les tests doivent passer.
 Pour un échec, commence par savoir si c'est **le jeu** ou **le test** qui est en cause, corrige le bon côté, et ajoute
 un test pour chaque nouveau bug trouvé. Piège connu : pendant un `await sleep()`, la vraie boucle du jeu tourne aussi
 (si le panneau est visible), un état bref (coup de pied) peut donc être déjà fini — vérifie plutôt un compteur.
@@ -74,6 +74,11 @@ Règles de jeu que la suite protège :
   ±5 % de puissance et un peu d'angle au hasard. **Effet** (`ball.spin`, effet Magnus `MAGNUS`) : la trajectoire se courbe,
   et au rebond l'effet relance (brossé) ou freine (rétro) la balle. Tête en pleine extension = « TÊTE ! » plus puissante,
   balle touchée de côté = un peu d'effet. Le nom du coup s'affiche au-dessus de la balle (`pop`, aussi envoyé en ligne).
+- **Poteaux** (`bouncePost`, `POST_LEN`) : vu de côté le poteau vertical est la ligne de but, donc seul son haut (le coin du
+  cadre, 30 px sous la barre) est solide : rebond très vif (`POST_BOUNCE`), « ting », « POTEAU ! ». Plus bas, c'est but.
+- **Vent** (`WINDS`, `wind`) : tiré à chaque match (25 % calme, sinon léger/moyen/fort, gauche ou droite), avec des rafales ;
+  il ne pousse la balle qu'en l'air. Affiché en haut à gauche (« 💨 VENT ▶▶ »), traînées blanches dans le ciel. Envoyé en ligne (`wd`).
+  `__hb.start(a, b, { wind })` met le vent à 0 par défaut pour que les autres tests restent reproductibles.
 - Fin du match (60 s) : appuis ignorés 1 s ; ensuite retour au choix des têtes (menu en ligne).
 - **IA** : difficile > moyen > facile en buts cumulés sur 16 matchs, et l'IA difficile bat un joueur immobile.
   Bug historique : l'IA qui court vers son but à travers la balle marque contre son camp → elle saute par-dessus.
@@ -91,6 +96,7 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
 - **Jauge de Maxou** sous le score, de son côté (aucune jauge pour les autres têtes) (se remplissent vers le centre, clignotent avec « 🔥 SUPER ! » quand elles sont pleines),
   aura de feu autour de la tête chargée, balle orange avec traînée de flammes et « 🔥 SUPER TIR ! » au déclenchement
   (`setPower(i, 100)` puis un tir pour le voir).
+- **Poteaux** : renfort métallique gris en haut de chaque poteau. **Vent** : panneau en haut à gauche, traînées dans le ciel.
 - **Chaussure** rouge (J1) / bleue (J2) qui monte pendant le tir. **Cages**, **HUD** (niveau d'IA sous le score), « BUUUT ! » + confettis.
 - **Mobile paysage** : `resize_window` 812×375, `setTouchMode(true)`. Pas de défilement horizontal, **aucun bouton**.
   Pendant le compte à rebours, l'aide (« Pouce gauche… / Pouce droit… », ou une par moitié à 2 avec la ligne pointillée)
@@ -113,7 +119,7 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
 
 ## 6. Rapport
 
-Termine par un résumé en français : résultat de la suite (X/32, détail des échecs), contrôles visuels faits
+Termine par un résumé en français : résultat de la suite (X/34, détail des échecs), contrôles visuels faits
 (capture si quelque chose a changé), bugs corrigés avec `fichier:ligne`, ce qui n'a pas pu être vérifié.
 
 Ne commite pas sans que l'utilisateur le demande.

@@ -160,6 +160,46 @@
       JSON.stringify({ normal, missile, lob, volee }));
   });
 
+  // 9c. Poteaux : le haut du poteau renvoie la balle (« POTEAU ! », pas de but) ; plus bas la balle passe et c'est but
+  await safe('poteaux', () => {
+    const out = [];
+    for (const left of [true, false]) {
+      for (const high of [true, false]) {
+        g.start(0, 4); P()[0].x = 300; P()[1].x = 660;
+        const px = left ? C.GOAL_W : C.W - C.GOAL_W, dir = left ? -1 : 1;
+        Object.assign(B(), { x: px - dir * 120, y: high ? C.BAR_Y + C.BAR_H + 12 : C.GROUND - 40, vx: dir * 14, vy: high ? -1 : 0, spin: 0 });
+        let bounced = false, label = '';
+        for (let k = 0; k < 40 && g.info().state === 'play'; k++) {
+          g.run(1); if (B().vx * dir < 0) bounced = true; if (g.pop().t > 0) label = g.pop().text;
+          if (bounced && Math.abs(B().x - px) > 70) break; // repartie : on s'arrête avant qu'un joueur ne la renvoie
+        }
+        out.push({ but: left ? 'gauche' : 'droite', tir: high ? 'haut' : 'bas', rebond: bounced, annonce: label, score: g.info().score.join('-') });
+      }
+    }
+    const ok = out.every((o) => o.tir === 'haut' ? o.rebond && o.annonce === 'POTEAU !' && o.score === '0-0' : o.score !== '0-0');
+    check('poteaux', ok, JSON.stringify(out));
+  });
+
+  // 9d. Vent : il pousse la balle en l'air (pas au sol), il change à chaque match, et il est envoyé en ligne
+  await safe('vent', () => {
+    const drift = (w) => {
+      g.start(0, 4, { wind: w }); P()[0].x = 100; P()[1].x = C.W - 100;
+      Object.assign(B(), { x: C.W / 2, y: C.GROUND - C.BALL_R - 1, vx: 0, vy: -13, spin: 0 });
+      g.run(1); let k = 0; while (k++ < 120 && B().y < C.GROUND - C.BALL_R - 0.5) g.run(1);
+      return Math.round(B().x - C.W / 2);
+    };
+    const droite = drift(0.05), gauche = drift(-0.05), calme = drift(0);
+    g.start(0, 4, { wind: 0.05 }); P()[0].x = 100; P()[1].x = C.W - 100;
+    Object.assign(B(), { x: C.W / 2, y: C.GROUND - C.BALL_R, vx: 0, vy: 0, spin: 0 }); g.run(60);
+    const auSol = Math.round(B().x - C.W / 2);
+    const tirages = new Set();
+    for (let n = 0; n < 24; n++) { g.chooseMenu(1); g.tap(cardX(0), 250); tirages.add(g.wind()); }
+    const valides = [...tirages].every((w) => g.winds.includes(Math.abs(w)));
+    g.toMenu();
+    check('vent', droite > 40 && gauche < -40 && Math.abs(calme) < 2 && Math.abs(auSol) < 2 && tirages.size >= 3 && valides,
+      JSON.stringify({ deriveVentDroite: droite, deriveVentGauche: gauche, sansVent: calme, balleAuSol: auSol, ventsTires: [...tirages].sort() }));
+  });
+
   // 10. Un seul tir par appui : garder la touche enfoncée ne relance pas la jambe
   await safe('tir unique', () => {
     g.start(0, 3); park();
@@ -323,7 +363,7 @@
   await safe('IA niveaux', () => {
     // buts cumulés sur 16 matchs, en changeant de côté à chaque match (les victoires seules sont trop aléatoires)
     const duel = (a, b, n) => { let ga = 0, gb = 0; for (let m = 0; m < n; m++) { const sw = m % 2; g.start(g.pickable[m % 4], g.boss, { mode: 'ai', ai: sw ? [b, a] : [a, b] }); g.run(62 * 60); const s = g.info().score; ga += sw ? s[1] : s[0]; gb += sw ? s[0] : s[1]; } return [ga, gb]; };
-    const d21 = duel(2, 1, 16), d10 = duel(1, 0, 16);
+    const d21 = duel(2, 1, 16), d10 = duel(1, 0, 24);
     let hard = [0, 0]; for (let m = 0; m < 4; m++) { g.start(0, 3, { mode: 'ai', ai: [null, 2] }); g.run(62 * 60); const s = g.info().score; hard[0] += s[1]; hard[1] += s[0]; }
     check('IA niveaux', d21[0] > d21[1] && d10[0] > d10[1] && hard[0] >= 4 && hard[0] > hard[1],
       JSON.stringify({ 'difficile-moyen (buts)': d21, 'moyen-facile': d10, 'difficile contre immobile (buts pour-contre)': hard }));
@@ -384,7 +424,7 @@
     const start = got.find((m) => m.t === 'start'), host = g.info();
     g.run(4 * 60);
     await until(() => got.some((m) => m.t === 's' && m.st === 'play'));
-    const snapOk = got.some((m) => m.t === 's' && m.st === 'play' && Array.isArray(m.pw) && m.pw.length === 2 && 'bf' in m); // état + jauges + balle en feu
+    const snapOk = got.some((m) => m.t === 's' && m.st === 'play' && Array.isArray(m.pw) && m.pw.length === 2 && 'bf' in m && 'wd' in m); // état + jauges + balle en feu + vent
     const x0 = P()[1].x;
     guest.send(JSON.stringify({ t: 'in', x: -1, j: false, k: 1, jc: 0 }));
     await sleep(200); g.run(20);
