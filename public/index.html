@@ -46,6 +46,19 @@ const POSTS = [GOAL_W, W - GOAL_W]; // x des poteaux
 // Vent : tiré au hasard à chaque match (calme, léger, moyen, fort, vers la gauche ou la droite), avec des rafales.
 // Il pousse la balle seulement quand elle est en l'air (px/image²).
 const WINDS = [0, 0.02, 0.035, 0.05];
+// Ballons : un tiré au hasard à chaque match (le classique 2 fois sur 5, les autres 1 fois sur 5).
+//   r : rayon, grav : gravité, drag : freinage dans l'air, bounce : rebond au sol, wall : rebond barre/poteaux (×),
+//   head : rebond sur la tête, kick : puissance des tirs (×), wind : sensibilité au vent (×)
+const BALLS = {
+  classique: { name: 'CLASSIQUE', r: 15, grav: 0.4, drag: 0.997, bounce: 0.71, wall: 1, head: 0.75, kick: 1, wind: 1, weight: 2 },
+  plage: { name: 'BALLON DE PLAGE', r: 22, grav: 0.22, drag: 0.985, bounce: 0.6, wall: 0.8, head: 0.85, kick: 0.82, wind: 1.7, weight: 1 },
+  boulet: { name: 'BOULET', r: 14, grav: 0.55, drag: 0.999, bounce: 0.38, wall: 0.55, head: 0.45, kick: 0.82, wind: 0.25, weight: 1 },
+  superballe: { name: 'SUPER BALLE', r: 12, grav: 0.4, drag: 0.998, bounce: 0.92, wall: 1.15, head: 0.95, kick: 1.05, wind: 1, weight: 1 },
+};
+function randomBall() {
+  const bag = Object.keys(BALLS).flatMap((k) => Array(BALLS[k].weight).fill(k));
+  return bag[(Math.random() * bag.length) | 0];
+}
 // Types de tir, choisis selon ce que fait le joueur au moment du tir (aucun bouton en plus) :
 //   power : vitesse, lift : angle vers le haut (rad), spin : effet (positif = brossé, la balle plonge ; négatif = rétro, elle flotte)
 const SHOTS = {
@@ -296,13 +309,15 @@ let timeLeft = MATCH_TIME;
 const score = [0, 0];
 const pick = [0, 4], ready = [false, false];
 const players = [0, 1].map((i) => ({ i, f: i === 0 ? 1 : -1, x: 0, y: REST_Y, vx: 0, vy: 0, onGround: true, kickT: 0, head: pick[i], power: 0, touchCd: 0 }));
-const ball = { x: W / 2, y: 150, vx: 0, vy: 0, r: BALL_R, rot: 0, fire: 0, fireBy: 0, spin: 0 };
+const ball = { x: W / 2, y: 150, vx: 0, vy: 0, r: BALL_R, rot: 0, fire: 0, fireBy: 0, spin: 0, type: 'classique' };
+const BT = () => BALLS[ball.type]; // réglages du ballon du match
 const pop = { text: '', x: 0, y: 0, t: 0 }; // nom du coup affiché au-dessus de la balle
 let superT = 0;
 let wind = 0; // durée d'affichage de « SUPER TIR ! »
 const particles = [];
 const BARS = [[0, BAR_Y, GOAL_W + 4, BAR_Y + BAR_H], [W - GOAL_W - 4, BAR_Y, W, BAR_Y + BAR_H]];
 
+function setBall(type) { ball.type = BALLS[type] ? type : 'classique'; ball.r = BT().r; }
 function kickoff() {
   players.forEach((p) => Object.assign(p, { x: p.i === 0 ? 220 : W - 220, y: REST_Y, vx: 0, vy: 0, onGround: true, kickT: 0 }));
   // la balle retombe au centre, légèrement vers celui qui vient d'encaisser
@@ -316,6 +331,7 @@ function startMatch() {
   superT = 0;
   const lvl = Math.random() < 0.25 ? 0 : 1 + ((Math.random() * 3) | 0);
   wind = WINDS[lvl] * (Math.random() < 0.5 ? -1 : 1);
+  setBall(randomBall());
   resetCtl(); touches.clear();
   kickoff(); state = 'countdown'; cd = 3 * 60 + 30; particles.length = 0;
 }
@@ -450,7 +466,7 @@ function snapshot() {
     t: 's', st: state, sc: score, tl: r1(timeLeft), cd, gt: goalT, ls: lastScorer, en: endNote,
     b: [r1(ball.x), r1(ball.y), r1(ball.rot)],
     p: players.map((p) => [r1(p.x), r1(p.y), r1(p.vx), r1(p.vy), p.kickT, p.onGround ? 1 : 0]),
-    pw: players.map((p) => Math.round(p.power)), bf: ball.fire > 0 ? 1 : 0, bb: ball.fireBy, wd: wind,
+    pw: players.map((p) => Math.round(p.power)), bf: ball.fire > 0 ? 1 : 0, bb: ball.fireBy, wd: wind, bt: ball.type,
     pop: pop.t > 0 ? [pop.text, Math.round(pop.x), Math.round(pop.y), pop.t] : null,
     ev: events.splice(0),
   };
@@ -463,6 +479,7 @@ function applySnap(m) {
   if (m.bf && !ball.fire) { superT = 60; ball.fireBy = m.bb; shake = 10; }
   ball.fire = m.bf ? 1 : 0;
   wind = m.wd || 0;
+  if (m.bt && m.bt !== ball.type) setBall(m.bt);
   if (m.pop) [pop.text, pop.x, pop.y, pop.t] = m.pop; else pop.t = 0;
   m.ev.forEach((name) => sfx[name] && sfx[name]());
   if (state === 'goal' && prev !== 'goal') confetti(lastScorer);
@@ -543,7 +560,8 @@ function bouncePost(px) {
   ball.x = px + nx * min; ball.y = cy + ny * min;
   const vn = ball.vx * nx + ball.vy * ny;
   if (vn < 0) {
-    ball.vx -= (1 + POST_BOUNCE) * vn * nx; ball.vy -= (1 + POST_BOUNCE) * vn * ny; ball.spin *= -0.6;
+    const k = 1 + Math.min(0.98, POST_BOUNCE * BT().wall);
+    ball.vx -= k * vn * nx; ball.vy -= k * vn * ny; ball.spin *= -0.6;
     if (vn < -3) { play('post'); showPop('POTEAU !'); shake = Math.max(shake, 5); }
   }
 }
@@ -554,7 +572,8 @@ function bounceRect(x0, y0, x1, y1) {
   ball.x = cx + nx * ball.r; ball.y = cy + ny * ball.r;
   const vn = ball.vx * nx + ball.vy * ny;
   if (vn < 0) {
-    ball.vx -= 1.6 * vn * nx; ball.vy -= 1.6 * vn * ny; ball.spin *= 0.7;
+    const k = 1 + 0.6 * BT().wall;
+    ball.vx -= k * vn * nx; ball.vy -= k * vn * ny; ball.spin *= 0.7;
     if (vn < -2) play('bounce');
     if (vn < -7) showPop('BARRE !');
   }
@@ -596,8 +615,9 @@ function updateBall() {
   const onGround = ball.y >= GROUND - ball.r - 0.5;
   // effet Magnus : la vitesse est déviée à 90° proportionnellement à l'effet (brossé = plonge, rétro = flotte)
   if (!onGround) { ball.vx += -MAGNUS * ball.spin * ball.vy; ball.vy += MAGNUS * ball.spin * ball.vx; }
-  if (!onGround) ball.vx += wind * (1 + 0.4 * Math.sin(frame / 45)); // vent, avec des rafales
-  ball.vy += BALL_GRAV; ball.vx *= 0.997; ball.spin *= SPIN_DECAY;
+  const bt = BT();
+  if (!onGround) { ball.vx += wind * bt.wind * (1 + 0.4 * Math.sin(frame / 45)); ball.vy *= bt.drag; } // vent (rafales), freinage de l'air
+  ball.vy += bt.grav; ball.vx *= bt.drag; ball.spin *= SPIN_DECAY;
   ball.x += ball.vx; ball.y += ball.vy;
   ball.rot += onGround ? ball.vx / ball.r : ball.spin;
   if (ball.y > GROUND - ball.r) {
@@ -605,7 +625,7 @@ function updateBall() {
     if (ball.vy > 2) play('bounce');
     // au rebond, l'effet « mord » le sol : brossé → la balle repart vers l'avant, rétro → elle freine / revient
     ball.vx += ball.spin * ball.r * 0.25; ball.spin *= 0.5;
-    ball.vy = Math.abs(ball.vy) < 1.2 ? 0 : -ball.vy * (0.66 + Math.random() * 0.1);
+    ball.vy = Math.abs(ball.vy) < 1.2 ? 0 : -ball.vy * (bt.bounce - 0.05 + Math.random() * 0.1);
     ball.vx *= 0.985;
   }
   if (ball.y < ball.r) { ball.y = ball.r; ball.vy = Math.abs(ball.vy) * 0.7; }
@@ -616,7 +636,7 @@ function updateBall() {
 
   for (const p of players) {
     if (ball.fire) break; // la balle en feu traverse tout le monde
-    if (bounceCircle(p.x, p.y, R, p.vx, p.vy, 0.75)) {
+    if (bounceCircle(p.x, p.y, R, p.vx, p.vy, BT().head)) {
       if (p.power >= 100 && hasFire(p)) { superShot(p); continue; } // super tête
       if (Math.hypot(ball.vx, ball.vy) > 4) play('head');
       ball.spin = clamp(ball.spin * 0.3 + (ball.x - p.x) / R * 0.12 * Math.sign(ball.vy || 1), -0.3, 0.3); // touche de côté = effet
@@ -632,7 +652,7 @@ function updateBall() {
       const shot = SHOTS[shotType(p)];
       // bon timing (pied qui monte, images 1 à 5) = pleine puissance ; balle frappée en fin de geste = tir plus mou
       const timing = p.kickT <= 5 ? 1 : p.kickT <= 7 ? 0.88 : 0.72;
-      const power = shot.power * timing * (0.95 + Math.random() * 0.1);
+      const power = shot.power * timing * BT().kick * (0.95 + Math.random() * 0.1);
       // angle : vers l'avant et vers le haut selon le type, corrigé par l'endroit où le pied touche la balle, + un peu de hasard
       const hit = clamp((ft.y - ball.y) / (FOOT_R + ball.r), -1, 1) * 0.25; // pied sous la balle = plus haut
       const a = shot.lift + hit + (Math.random() - 0.5) * 0.12;
@@ -875,13 +895,29 @@ function drawBall() {
   }
   ctx.save();
   ctx.translate(ball.x, ball.y); ctx.rotate(ball.rot);
-  ctx.fillStyle = ball.fire ? '#ffb347' : '#fff'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(0, 0, ball.r, 0, 7); ctx.fill();
+  const r = ball.r;
+  ctx.fillStyle = ball.fire ? '#ffb347' : { classique: '#fff', plage: '#fff', boulet: '#3a3d46', superballe: '#3ddc84' }[ball.type];
+  ctx.strokeStyle = OUTLINE; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
   ctx.save(); ctx.clip();
-  ctx.fillStyle = OUTLINE;
-  const pent = (cx, cy, s) => { ctx.beginPath(); for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + k * 2 * Math.PI / 5; ctx.lineTo(cx + Math.cos(a) * s, cy + Math.sin(a) * s); } ctx.fill(); };
-  pent(0, 0, 5.5);
-  for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + k * 2 * Math.PI / 5; pent(Math.cos(a) * 15, Math.sin(a) * 15, 5); }
+  if (ball.type === 'plage') { // quartiers de couleur et pastille blanche
+    ['#ff3b3b', '#ffd93d', '#2f7bff', '#fff', '#ff9f1c', '#3ddc84'].forEach((c, k) => {
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, k * Math.PI / 3, (k + 1) * Math.PI / 3); ctx.fill();
+    });
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, r * 0.28, 0, 7); ctx.fill();
+  } else if (ball.type === 'boulet') { // boulet de fer : reflet et rivets
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.arc(-r * 0.35, -r * 0.35, r * 0.35, 0, 7); ctx.fill();
+    ctx.fillStyle = '#1b1d24'; for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.6; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.6, Math.sin(a) * r * 0.6, 2, 0, 7); ctx.fill(); }
+  } else if (ball.type === 'superballe') { // super balle : spirale rose
+    ctx.strokeStyle = '#ff7ad9'; ctx.lineWidth = 3.5; ctx.beginPath();
+    for (let t = 0; t < 12; t += 0.2) ctx.lineTo(Math.cos(t) * t * r / 12, Math.sin(t) * t * r / 12);
+    ctx.stroke();
+  } else { // ballon de foot
+    ctx.fillStyle = OUTLINE;
+    const pent = (cx, cy, s) => { ctx.beginPath(); for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + k * 2 * Math.PI / 5; ctx.lineTo(cx + Math.cos(a) * s, cy + Math.sin(a) * s); } ctx.fill(); };
+    pent(0, 0, 5.5);
+    for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + k * 2 * Math.PI / 5; pent(Math.cos(a) * 15, Math.sin(a) * 15, 5); }
+  }
   ctx.restore();
   ctx.beginPath(); ctx.arc(0, 0, ball.r, 0, 7); ctx.stroke();
   ctx.restore();
@@ -932,6 +968,9 @@ function drawHud() {
   ctx.font = font(18); ctx.textAlign = 'left';
   if (lvl <= 0) outlinedText('💨 PAS DE VENT', 24, 30, '#fff', 4);
   else outlinedText('💨 VENT ' + (wind > 0 ? '▶'.repeat(lvl) : '◀'.repeat(lvl)), 24, 30, ['', '#bdeeff', '#ffd93d', '#ff7a45'][lvl], 4);
+  ctx.fillStyle = 'rgba(27,27,47,0.85)'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(12, 54, 168, 30, 12); ctx.fill(); ctx.stroke();
+  ctx.font = font(14); outlinedText('⚽ ' + BT().name, 24, 70, '#fff', 4);
   ctx.textAlign = 'center';
 }
 // joystick fantôme : visible seulement sous le pouce, pendant qu'on le tient
@@ -1071,6 +1110,7 @@ function render() {
     const n = Math.ceil((cd - 30) / 60);
     ctx.font = font(n > 0 ? 120 : 100);
     outlinedText(n > 0 ? String(n) : 'GO !', W / 2, H / 2 - 50, '#ffd93d', 12);
+    if (ball.type !== 'classique') { ctx.font = font(34); outlinedText('⚽ ' + BT().name + ' !', W / 2, H / 2 + 40, '#ff7ad9', 8); }
   }
   if (state === 'goal') {
     const k = Math.min(1, (110 - goalT) / 12);
@@ -1131,7 +1171,7 @@ if (DEBUG) {
       toMenu(); mode = o.mode || 'local'; pick[0] = a; pick[1] = b;
       aiSlots[0] = o.ai ? o.ai[0] : null; aiSlots[1] = o.ai ? o.ai[1] : null;
       if (aiSlots[1] !== null) aiLevel = aiSlots[1];
-      startMatch(); wind = o.wind || 0; cd = 1; step(); // vent nul par défaut : tests reproductibles
+      startMatch(); wind = o.wind || 0; setBall(o.ball || 'classique'); cd = 1; step(); // vent nul et ballon classique par défaut : tests reproductibles
     },
     toMenu, toSelect, chooseMenu, key: uiKey, tap: (x, y) => uiTap({ x, y }),
     run(n = 1) { for (let i = 0; i < n; i++) step(); },
@@ -1140,7 +1180,7 @@ if (DEBUG) {
     info: () => ({ state, mode, aiLevel, aiSlots: [...aiSlots], me, score: [...score], timeLeft, pick: [...pick], ready: [...ready], touchMode, endNote, waitMsg,
       net: net ? { role: net.role, ready: net.ws.readyState } : null }),
     ball: () => ball, players: () => players, ctl: () => ctl, footPos, touches: () => [...touches.values()],
-    pollLobby, lobby: () => lobby, pop: () => pop, shots: SHOTS, winds: WINDS, wind: () => wind, setWind(v) { wind = v; },
+    pollLobby, lobby: () => lobby, pop: () => pop, shots: SHOTS, winds: WINDS, wind: () => wind, setWind(v) { wind = v; }, balls: BALLS, setBall,
     setTime(s) { timeLeft = s; }, setPower(i, v) { players[i].power = v; }, setTouchMode(b) { touchMode = b; }, render,
   };
 }

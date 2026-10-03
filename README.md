@@ -39,6 +39,9 @@ donne plus de puissance.
 **Poteaux et vent** : le haut des poteaux renvoie la balle (« POTEAU ! »). À chaque match, un vent différent
 (affiché en haut à gauche) pousse la balle quand elle est en l'air.
 
+**Ballons** : à chaque match, un ballon au hasard — classique, **ballon de plage** (gros, flotte, emporté par le vent),
+**boulet** (lourd, rebondit peu) ou **super balle** (rebondit partout).
+
 Match de 60 secondes. Pour renommer un personnage : tableau `HEADS` en haut du script.
 
 ## Tester en local

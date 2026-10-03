@@ -40,7 +40,7 @@ La QA teste le jeu **image par image** grâce au mode `?debug`. Le panneau navig
 
 ## 3. Suite de tests automatisés
 
-La suite est dans `checks.js`, à côté de ce fichier : 34 tests, dont 3 en ligne (la page se connecte au serveur,
+La suite est dans `checks.js`, à côté de ce fichier : 35 tests, dont 3 en ligne (la page se connecte au serveur,
 le test simule l'autre joueur avec son propre WebSocket). Le script est **asynchrone** :
 
 1. `cp .claude/skills/qa-jeu/checks.js public/__qa_checks_tmp.js` (fichier dans le `.gitignore`).
@@ -79,6 +79,10 @@ Règles de jeu que la suite protège :
 - **Vent** (`WINDS`, `wind`) : tiré à chaque match (25 % calme, sinon léger/moyen/fort, gauche ou droite), avec des rafales ;
   il ne pousse la balle qu'en l'air. Affiché en haut à gauche (« 💨 VENT ▶▶ »), traînées blanches dans le ciel. Envoyé en ligne (`wd`).
   `__hb.start(a, b, { wind })` met le vent à 0 par défaut pour que les autres tests restent reproductibles.
+- **Ballons** (`BALLS`, `setBall`) : tiré à chaque match (classique 2/5, sinon ballon de plage, boulet, super balle).
+  Plage : gros, léger, freiné par l'air, très sensible au vent ; boulet : lourd, rebondit peu, tirs plus courts, presque
+  insensible au vent ; super balle : petite, rebondit énormément (sol, barre, poteaux, têtes). Annoncé pendant le compte
+  à rebours, affiché sous le vent, envoyé en ligne (`bt`). `__hb.start(a, b, { ball })` = classique par défaut.
 - Fin du match (60 s) : appuis ignorés 1 s ; ensuite retour au choix des têtes (menu en ligne).
 - **IA** : difficile > moyen > facile en buts cumulés sur 16 matchs, et l'IA difficile bat un joueur immobile.
   Bug historique : l'IA qui court vers son but à travers la balle marque contre son camp → elle saute par-dessus.
@@ -96,6 +100,7 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
 - **Jauge de Maxou** sous le score, de son côté (aucune jauge pour les autres têtes) (se remplissent vers le centre, clignotent avec « 🔥 SUPER ! » quand elles sont pleines),
   aura de feu autour de la tête chargée, balle orange avec traînée de flammes et « 🔥 SUPER TIR ! » au déclenchement
   (`setPower(i, 100)` puis un tir pour le voir).
+- **Ballons** : dessin propre à chacun (quartiers colorés, boulet gris à rivets, super balle verte à spirale rose).
 - **Poteaux** : renfort métallique gris en haut de chaque poteau. **Vent** : panneau en haut à gauche, traînées dans le ciel.
 - **Chaussure** rouge (J1) / bleue (J2) qui monte pendant le tir. **Cages**, **HUD** (niveau d'IA sous le score), « BUUUT ! » + confettis.
 - **Mobile paysage** : `resize_window` 812×375, `setTouchMode(true)`. Pas de défilement horizontal, **aucun bouton**.
@@ -119,7 +124,7 @@ Captures : `start`, `run`, `render()`, puis `computer screenshot`. Vérifie :
 
 ## 6. Rapport
 
-Termine par un résumé en français : résultat de la suite (X/34, détail des échecs), contrôles visuels faits
+Termine par un résumé en français : résultat de la suite (X/35, détail des échecs), contrôles visuels faits
 (capture si quelque chose a changé), bugs corrigés avec `fichier:ligne`, ce qui n'a pas pu être vérifié.
 
 Ne commite pas sans que l'utilisateur le demande.

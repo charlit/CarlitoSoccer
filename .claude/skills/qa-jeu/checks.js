@@ -200,6 +200,37 @@
       JSON.stringify({ deriveVentDroite: droite, deriveVentGauche: gauche, sansVent: calme, balleAuSol: auSol, ventsTires: [...tirages].sort() }));
   });
 
+  // 9e. Ballons : chacun se comporte autrement (rebond, chute, vent, puissance du tir), tirage au hasard à chaque match
+  await safe('ballons', () => {
+    const mesure = (type) => {
+      // lâché de 200 px : hauteur du 1er rebond et temps de chute
+      g.start(0, 4, { ball: type }); P()[0].x = 100; P()[1].x = C.W - 100;
+      const r = B().r;
+      Object.assign(B(), { x: C.W / 2, y: C.GROUND - r - 200, vx: 0, vy: 0, spin: 0 });
+      let t = 0; while (t++ < 200 && B().y < C.GROUND - r - 0.5) g.run(1);
+      let top = C.GROUND; for (let k = 0; k < 80; k++) { g.run(1); top = Math.min(top, B().y); }
+      const rebond = Math.round(C.GROUND - r - top);
+      // vent fort vers la droite : dérive d'une chandelle
+      g.start(0, 4, { ball: type, wind: 0.05 }); P()[0].x = 100; P()[1].x = C.W - 100;
+      Object.assign(B(), { x: C.W / 2, y: C.GROUND - r - 1, vx: 0, vy: -10, spin: 0 }); g.run(1);
+      let k = 0; while (k++ < 160 && B().y < C.GROUND - r - 0.5) g.run(1);
+      const vent = Math.round(B().x - C.W / 2);
+      // tir normal de J1 : vitesse de départ
+      g.start(0, 4, { ball: type }); P()[1].x = C.W - 60;
+      const ft = g.footPos(P()[0]);
+      Object.assign(B(), { x: ft.x + 24, y: C.GROUND - r, vx: 0, vy: 0 });
+      g.press(0, 'kick'); let v = 0; for (let n = 0; n < 12; n++) { g.run(1); v = Math.max(v, Math.hypot(B().vx, B().vy)); } g.release(0, 'kick');
+      return { rayon: r, rebond, chute: t, vent, tir: +v.toFixed(1) };
+    };
+    const m = {}; for (const type of Object.keys(g.balls)) m[type] = mesure(type);
+    const tirages = new Set(); for (let n = 0; n < 30; n++) { g.chooseMenu(1); g.tap(cardX(0), 250); tirages.add(g.ball().type); }
+    g.toMenu();
+    const c = m.classique;
+    check('ballons', m.superballe.rebond > c.rebond + 30 && m.boulet.rebond < c.rebond - 30 && m.plage.chute > c.chute + 8
+      && m.plage.vent > c.vent * 1.5 && m.boulet.vent < c.vent / 2 && m.boulet.tir < c.tir && m.plage.rayon > c.rayon && tirages.size === 4,
+      JSON.stringify({ ...m, tirages: [...tirages] }));
+  });
+
   // 10. Un seul tir par appui : garder la touche enfoncée ne relance pas la jambe
   await safe('tir unique', () => {
     g.start(0, 3); park();
@@ -424,7 +455,7 @@
     const start = got.find((m) => m.t === 'start'), host = g.info();
     g.run(4 * 60);
     await until(() => got.some((m) => m.t === 's' && m.st === 'play'));
-    const snapOk = got.some((m) => m.t === 's' && m.st === 'play' && Array.isArray(m.pw) && m.pw.length === 2 && 'bf' in m && 'wd' in m); // état + jauges + balle en feu + vent
+    const snapOk = got.some((m) => m.t === 's' && m.st === 'play' && Array.isArray(m.pw) && m.pw.length === 2 && 'bf' in m && 'wd' in m && m.bt); // état + jauges + balle en feu + vent + ballon
     const x0 = P()[1].x;
     guest.send(JSON.stringify({ t: 'in', x: -1, j: false, k: 1, jc: 0 }));
     await sleep(200); g.run(20);
